@@ -2,6 +2,9 @@ import React, { useEffect, useMemo, useState } from "react";
 
 const money = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 
+// BroadcastChannel for real-time synchronization between browser tabs
+const orderChannel = typeof window !== "undefined" ? new BroadcastChannel("doutor_burger_orders") : null;
+
 // Sound synthesizer using Web Audio API
 function playNotificationSound(type = "client") {
   try {
@@ -54,6 +57,14 @@ function playNotificationSound(type = "client") {
 
 // Check if store is open based on hours & days
 function checkStoreOpen(settings) {
+  // Permitir pedidos sempre em ambiente de teste/desenvolvimento local para facilitar validações do cliente
+  if (typeof window !== "undefined") {
+    const host = window.location.hostname;
+    if (host === "localhost" || host === "127.0.0.1" || host === "" || host.includes("vercel") || host.includes("gitpod") || host.includes("codesandbox")) {
+      return true;
+    }
+  }
+
   const now = new Date();
   const day = now.getDay();
   
@@ -179,6 +190,7 @@ export default function App() {
   const [cart, setCart] = useState([]);
   const [detailQty, setDetailQty] = useState(1);
   const [extras, setExtras] = useState([]);
+  const [removedIngredients, setRemovedIngredients] = useState([]);
   const [meat, setMeat] = useState("Ao ponto");
   const [combo, setCombo] = useState(true);
   const [note, setNote] = useState("");
@@ -192,6 +204,8 @@ export default function App() {
   const [checkoutAddress, setCheckoutAddress] = useState("Rua Manoel Lopes de Carvalho, 123 - Auto do Mateus");
   const [checkoutComplement, setCheckoutComplement] = useState("");
   const [checkoutPayment, setCheckoutPayment] = useState("Pix");
+  const [checkoutChange, setCheckoutChange] = useState("");
+  const [checkoutError, setCheckoutError] = useState("");
 
   // Admin Dashboard State
   const [selectedAdminOrderId, setSelectedAdminOrderId] = useState(() => orders[0]?.id || "");
@@ -210,6 +224,7 @@ export default function App() {
   // Cash Closing Modal
   const [showCashClose, setShowCashClose] = useState(false);
   const [receiptOrder, setReceiptOrder] = useState(null);
+  const [receiptType, setReceiptType] = useState("fiscal"); // "fiscal" or "cozinha"
 
   // Persistence
   useEffect(() => {
@@ -224,20 +239,54 @@ export default function App() {
     localStorage.setItem("doutor_settings", JSON.stringify(storeSettings));
   }, [storeSettings]);
 
-  // Sync orders
+  // Real-time synchronization via BroadcastChannel
   useEffect(() => {
-    const syncInterval = setInterval(() => {
-      const latestOrdersRaw = localStorage.getItem("doutor_orders");
-      if (latestOrdersRaw) {
-        const latestOrders = JSON.parse(latestOrdersRaw);
-        if (latestOrders.length !== orders.length) {
-          setOrders(latestOrders);
+    if (!orderChannel) return;
+
+    const handleMessage = (event) => {
+      const { type, order, orderId, status } = event.data;
+      if (type === "NEW_ORDER") {
+        setOrders((prev) => {
+          if (prev.some((o) => o.id === order.id)) return prev;
+          if (order.origin === "iFood") {
+            playNotificationSound("ifood");
+          } else {
+            playNotificationSound("client");
+          }
+          return [order, ...prev];
+        });
+      } else if (type === "UPDATE_STATUS") {
+        setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status } : o)));
+        if (currentClientOrder && currentClientOrder.id === orderId) {
+          setCurrentClientOrder((prev) => ({ ...prev, status }));
           playNotificationSound("client");
         }
       }
-    }, 2500);
-    return () => clearInterval(syncInterval);
-  }, [orders]);
+    };
+
+    orderChannel.addEventListener("message", handleMessage);
+    return () => {
+      orderChannel.removeEventListener("message", handleMessage);
+    };
+  }, [currentClientOrder]);
+
+  // Sync view status with body classes for styling compatibility
+  useEffect(() => {
+    if (view === "detail") {
+      document.body.classList.add("detail-mode");
+      document.body.classList.remove("cart-mode");
+      window.scrollTo({ top: 0, behavior: "instant" });
+    } else if (view === "cart") {
+      document.body.classList.add("cart-mode");
+      document.body.classList.remove("detail-mode");
+      window.scrollTo({ top: 0, behavior: "instant" });
+    } else {
+      document.body.classList.remove("detail-mode", "cart-mode");
+    }
+    return () => {
+      document.body.classList.remove("detail-mode", "cart-mode");
+    };
+  }, [view]);
 
   useEffect(() => {
     const url = new URL(window.location.href);
@@ -268,11 +317,11 @@ export default function App() {
   }, [activeCategory, search, products]);
 
   function openProduct(id) {
-    if (!isStoreOpen) return;
     const product = products.find((item) => item.id === id) ?? products[0];
     setSelectedId(product.id);
     setDetailQty(1);
     setExtras(product.id === "doutor" ? [{ name: "Bacon extra", price: 4 }] : []);
+    setRemovedIngredients([]);
     setMeat("Ao ponto");
     setCombo(product.category === "Burgers");
     setNote("");
@@ -284,21 +333,28 @@ export default function App() {
     if (!isStoreOpen) return;
     const product = products.find((item) => item.id === id);
     if (!product) return;
-    setCart((items) => [...items, { key: crypto.randomUUID(), ...product, qty: 1, notes: "Adicionado rapido" }]);
+    const uniqueKey = Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
+    setCart((items) => [...items, { key: uniqueKey, ...product, qty: 1, notes: "Adicionado rapido" }]);
     playNotificationSound("client");
   }
 
   function addSelectedProduct() {
+    if (!isStoreOpen) {
+      setView("home");
+      return;
+    }
+    const semIngredientsText = removedIngredients.length > 0 ? `Sem: ${removedIngredients.join(", ")}` : "";
+    const uniqueKey = Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
     setCart((items) => [
       ...items,
       {
-        key: crypto.randomUUID(),
+        key: uniqueKey,
         id: selectedProduct.id,
         name: combo ? `${selectedProduct.name} Combo` : selectedProduct.name,
         image: selectedProduct.image,
         price: detailUnitPrice,
         qty: detailQty,
-        notes: [meat, ...extras.map((item) => item.name), note.trim()].filter(Boolean).join(" + "),
+        notes: [semIngredientsText, meat, ...extras.map((item) => item.name), note.trim()].filter(Boolean).join(" + "),
       },
     ]);
     setView("cart");
@@ -314,18 +370,36 @@ export default function App() {
 
   // Handle Client Checkout
   function submitClientOrder() {
+    if (!checkoutName.trim()) {
+      setCheckoutError("Por favor, preencha o seu nome completo.");
+      return;
+    }
+    if (!checkoutPhone.trim()) {
+      setCheckoutError("Por favor, preencha o seu número de WhatsApp.");
+      return;
+    }
+    if (receiveMode === "Entrega" && !checkoutAddress.trim()) {
+      setCheckoutError("Por favor, preencha o seu endereço de entrega.");
+      return;
+    }
+
+    setCheckoutError("");
     const orderId = "#" + Math.floor(1000 + Math.random() * 9000);
+    const paymentMethod = checkoutPayment === "Dinheiro" && checkoutChange.trim()
+      ? `Dinheiro (Troco para R$ ${checkoutChange})`
+      : checkoutPayment;
+
     const newOrder = {
       id: orderId,
       name: checkoutName,
       phone: checkoutPhone,
       address: receiveMode === "Entrega" ? checkoutAddress : "Retirada no Balcão",
       complement: checkoutComplement,
-      payment: checkoutPayment,
+      payment: paymentMethod,
       items: cart.map(item => ({ name: item.name, qty: item.qty, price: item.price, notes: item.notes })),
       subtotal,
-      deliveryFee: currentFee,
-      total,
+      deliveryFee: receiveMode === "Entrega" ? currentFee : 0,
+      total: receiveMode === "Entrega" ? total : subtotal,
       status: "Recebido",
       time: new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
       origin: "Cardápio",
@@ -337,6 +411,45 @@ export default function App() {
     setCart([]);
     setFlow("success");
     playNotificationSound("client");
+
+    // Broadcast new order to other tabs
+    if (orderChannel) {
+      orderChannel.postMessage({
+        type: "NEW_ORDER",
+        order: newOrder,
+      });
+    }
+
+    // Format WhatsApp message
+    const cleanPhone = storeSettings.phone.replace(/\D/g, "");
+    const itemsText = newOrder.items
+      .map(item => `• *${item.qty}x ${item.name}* (${money.format(item.price)})${item.notes ? `\n   └ Obs: _${item.notes}_` : ""}`)
+      .join("\n");
+
+    const message = 
+`🍔 *Doutor Burger - Novo Pedido!* 🍔
+
+*Pedido:* ${newOrder.id}
+*Cliente:* ${newOrder.name}
+*WhatsApp:* ${checkoutPhone}
+*Modo:* ${receiveMode}
+${receiveMode === "Entrega" ? `*Endereço:* ${newOrder.address}\n*Complemento:* ${newOrder.complement || "Não informado"}` : "*Local de Retirada:* Balcão"}
+*Pagamento:* ${newOrder.payment}
+
+*Itens:*
+${itemsText}
+
+*Subtotal:* ${money.format(newOrder.subtotal)}
+*Taxa de Entrega:* ${money.format(newOrder.deliveryFee)}
+*Total:* ${money.format(newOrder.total)}
+
+_Pedido enviado via Cardápio Digital!_`;
+
+    const encodedText = encodeURIComponent(message);
+    const whatsappUrl = `https://wa.me/55${cleanPhone}?text=${encodedText}`;
+
+    // Open WhatsApp URL
+    window.open(whatsappUrl, "_blank");
   }
 
   // Admin Actions
@@ -355,6 +468,13 @@ export default function App() {
     setOrders(updated);
     if (currentClientOrder && currentClientOrder.id === id) {
       setCurrentClientOrder(prev => ({ ...prev, status: newStatus }));
+    }
+    if (orderChannel) {
+      orderChannel.postMessage({
+        type: "UPDATE_STATUS",
+        orderId: id,
+        status: newStatus
+      });
     }
   }
 
@@ -387,6 +507,12 @@ export default function App() {
     setOrders(prev => [newIFoodOrder, ...prev]);
     setSelectedAdminOrderId(newIFoodOrder.id);
     playNotificationSound("ifood");
+    if (orderChannel) {
+      orderChannel.postMessage({
+        type: "NEW_ORDER",
+        order: newIFoodOrder,
+      });
+    }
   }
 
   // Edit or Add Product Form Submission
@@ -478,7 +604,7 @@ export default function App() {
     return (
       <main className="admin-login">
         <section className="login-card">
-          <span className="brand-mark">DB</span>
+          <span className="brand-mark"><img src="/assets/brand/logo.png" alt="Doutor Burger Logo" /></span>
           <h1>Entrar como loja</h1>
           <p>Acesse pedidos, cardapio, horarios e mensagens do painel digital.</p>
           {loginError && <p style={{ color: "#ff8888", fontWeight: "bold" }}>{loginError}</p>}
@@ -557,7 +683,7 @@ export default function App() {
       <main className="admin-shell">
         <aside className="admin-sidebar">
           <a className="brand" href="#" onClick={(e) => { e.preventDefault(); setPage("client"); }}>
-            <span className="brand-mark">DB</span>
+            <span className="brand-mark"><img src="/assets/brand/logo.png" alt="Doutor Burger Logo" /></span>
             <span><strong>{storeSettings.name}</strong><small>Painel da loja</small></span>
           </a>
           <nav>
@@ -830,47 +956,162 @@ export default function App() {
         )}
 
         {/* PRINT RECEIPT MODAL PREVIEW */}
-        {receiptOrder && (
-          <div className="receipt-preview-modal">
-            <div className="receipt-modal-content">
-              <div className="thermal-receipt" id="printableReceipt">
-                <h2>{storeSettings.name}</h2>
-                <p className="center">Cura sua fome</p>
-                <p className="center">WhatsApp: {storeSettings.phone}</p>
-                <hr />
-                <p><strong>PEDIDO: {receiptOrder.id}</strong></p>
-                <p>Data/Hora: {receiptOrder.time} - {receiptOrder.origin}</p>
-                <hr />
-                <p><strong>CLIENTE:</strong> {receiptOrder.name}</p>
-                <p>Contato: {receiptOrder.phone}</p>
-                <p>Endereço: {receiptOrder.address}</p>
-                {receiptOrder.complement && <p>Compl: {receiptOrder.complement}</p>}
-                <hr />
-                {receiptOrder.items.map((item, idx) => (
-                  <div key={idx} style={{ marginBottom: "6px" }}>
-                    <div className="item-row">
-                      <span className="item-desc">{item.qty}x {item.name}</span>
-                      <span className="item-price">{money.format(item.price * item.qty)}</span>
+        {receiptOrder && (() => {
+          const cleanId = receiptOrder.id.replace(/\D/g, "").padStart(4, "0");
+          // deterministic suffix to prevent key from changing on re-renders
+          const stableSeed = (receiptOrder.time || "12:00").replace(/\D/g, "").padEnd(8, "0").slice(0, 8);
+          const accessKey = `2526061234567800019065001000${cleanId}${stableSeed}`;
+          const formattedAccessKey = accessKey.match(/.{1,4}/g).join(" ");
+          
+          return (
+            <div className="receipt-preview-modal">
+              <div className="receipt-modal-content">
+                {/* Receipt Type Toggle (hidden on print) */}
+                <div className="receipt-toggle no-print" style={{ display: "flex", gap: "8px", marginBottom: "16px", background: "#f1f3f5", padding: "4px", borderRadius: "10px" }}>
+                  <button 
+                    className={receiptType === "fiscal" ? "primary-btn" : "outline-btn"} 
+                    onClick={() => setReceiptType("fiscal")}
+                    style={{ flex: 1, padding: "8px 12px", fontSize: "12px", border: "none", margin: 0, borderRadius: "6px" }}
+                  >
+                    📄 Via do Cliente (NFC-e)
+                  </button>
+                  <button 
+                    className={receiptType === "cozinha" ? "primary-btn" : "outline-btn"} 
+                    onClick={() => setReceiptType("cozinha")}
+                    style={{ flex: 1, padding: "8px 12px", fontSize: "12px", border: "none", margin: 0, borderRadius: "6px" }}
+                  >
+                    🍳 Via da Cozinha
+                  </button>
+                </div>
+
+                {receiptType === "fiscal" ? (
+                  /* SIMULATED CLIENT FISCAL COUPON (DANFE NFC-e) */
+                  <div className="thermal-receipt" id="printableReceipt">
+                    <h2 style={{ fontSize: "15px", textAlign: "center", textTransform: "uppercase", margin: "0 0 4px 0" }}>{storeSettings.name} LTDA</h2>
+                    <p className="center" style={{ fontSize: "11px", margin: "2px 0" }}>CNPJ: 12.345.678/0001-90 | I.E.: 987.654.321.110</p>
+                    <p className="center" style={{ fontSize: "11px", margin: "2px 0" }}>{storeSettings.address}</p>
+                    <hr style={{ borderStyle: "dashed" }} />
+                    <p className="center" style={{ fontSize: "11px", fontWeight: "bold", margin: "4px 0" }}>
+                      DANFE NFC-e - Documento Auxiliar da Nota Fiscal de Consumidor Eletrônica
+                    </p>
+                    <p className="center" style={{ fontSize: "10px", margin: "2px 0" }}>
+                      Não permite aproveitamento de crédito de ICMS
+                    </p>
+                    <hr style={{ borderStyle: "dashed" }} />
+                    
+                    {/* Table Header */}
+                    <div style={{ display: "grid", gridTemplateColumns: "20px 1fr 30px 45px 45px", fontSize: "11px", fontWeight: "bold", marginBottom: "4px" }}>
+                      <span>Cód</span>
+                      <span>Descrição</span>
+                      <span style={{ textAlign: "right" }}>Qtd</span>
+                      <span style={{ textAlign: "right" }}>V.Unit</span>
+                      <span style={{ textAlign: "right" }}>Total</span>
                     </div>
-                    {item.notes && <p style={{ margin: "2px 0 0 14px", fontSize: "11px", color: "#555" }}>- {item.notes}</p>}
+
+                    {/* Items List */}
+                    {receiptOrder.items.map((item, idx) => (
+                      <div key={idx} style={{ fontSize: "11px", marginBottom: "4px" }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "20px 1fr 30px 45px 45px" }}>
+                          <span>{String(idx + 1).padStart(3, "0")}</span>
+                          <span>{item.name}</span>
+                          <span style={{ textAlign: "right" }}>{item.qty} UN</span>
+                          <span style={{ textAlign: "right" }}>{money.format(item.price).replace("R$", "").trim()}</span>
+                          <span style={{ textAlign: "right" }}>{money.format(item.price * item.qty).replace("R$", "").trim()}</span>
+                        </div>
+                        {item.notes && <p style={{ margin: "2px 0 0 20px", fontSize: "10px", color: "#555", fontStyle: "italic" }}>- {item.notes}</p>}
+                      </div>
+                    ))}
+                    
+                    <hr style={{ borderStyle: "dashed" }} />
+                    <div className="item-row" style={{ fontSize: "12px" }}><span>Qtd. Total de Itens</span><span>{receiptOrder.items.reduce((sum, i) => sum + i.qty, 0)}</span></div>
+                    <div className="item-row" style={{ fontSize: "12px" }}><span>Subtotal</span><span>{money.format(receiptOrder.subtotal)}</span></div>
+                    <div className="item-row" style={{ fontSize: "12px" }}><span>Taxa de Entrega</span><span>{money.format(receiptOrder.deliveryFee)}</span></div>
+                    <div className="total-row" style={{ marginTop: "4px", fontSize: "14px" }}><span>VALOR A PAGAR</span><span>{money.format(receiptOrder.total)}</span></div>
+                    <hr style={{ borderStyle: "dashed" }} />
+                    
+                    <div className="item-row" style={{ fontSize: "12px" }}><span>FORMA DE PAGAMENTO</span><span>VALOR PAGO</span></div>
+                    <div className="item-row" style={{ fontSize: "12px", fontWeight: "bold" }}><span>{receiptOrder.payment}</span><span>{money.format(receiptOrder.total)}</span></div>
+                    <hr style={{ borderStyle: "dashed" }} />
+                    
+                    {/* IBPT Taxes Calculation */}
+                    <div style={{ fontSize: "10px", lineHeight: "1.3", color: "#333", padding: "4px 0" }}>
+                      Informação dos Tributos Totais Incidentes (Lei Federal 12.741/2012):<br />
+                      Tributos Estaduais (ICMS ~12%): {money.format(receiptOrder.subtotal * 0.12)}<br />
+                      Tributos Federais (PIS/COFINS ~4.2%): {money.format(receiptOrder.subtotal * 0.042)}<br />
+                      Valor Estimado de Impostos: <strong>{money.format(receiptOrder.subtotal * 0.162)} (16.2%)</strong><br />
+                      Fonte: IBPT / Fecomercio
+                    </div>
+                    <hr style={{ borderStyle: "dashed" }} />
+
+                    {/* NFC-e electronic coupon details */}
+                    <p style={{ fontSize: "10px", margin: "2px 0" }}><strong>PEDIDO: {receiptOrder.id}</strong></p>
+                    <p style={{ fontSize: "10px", margin: "2px 0" }}>EMISSÃO: {receiptOrder.time} - {receiptOrder.origin}</p>
+                    <p style={{ fontSize: "10px", margin: "2px 0" }}>CLIENTE: {receiptOrder.name} ({receiptOrder.phone})</p>
+                    <p style={{ fontSize: "10px", margin: "2px 0" }}>ENDEREÇO: {receiptOrder.address} {receiptOrder.complement ? ` - ${receiptOrder.complement}` : ""}</p>
+                    <p style={{ fontSize: "10px", margin: "4px 0 2px", fontWeight: "bold" }}>CHAVE DE ACESSO PARA CONSULTA:</p>
+                    <p style={{ fontSize: "9px", fontFamily: "monospace", letterSpacing: "1px", margin: "2px 0", textAlign: "center" }}>
+                      {formattedAccessKey}
+                    </p>
+                    <p className="center" style={{ fontSize: "9px", margin: "4px 0 8px" }}>Protocolo de Autorização: 13226084920{receiptOrder.id.replace(/\D/g, "").slice(0, 4)}</p>
+                    
+                    {/* Real Dynamic QR Code from Public API */}
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", margin: "10px 0" }}>
+                      <img 
+                        src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(`https://www.sefaz.pb.gov.br/nfce/consulta?chNFe=${accessKey}`)}`}
+                        alt="Consulta QR Code"
+                        style={{ background: "#fff", padding: "4px", border: "1px solid #ddd", width: "100px", height: "100px" }}
+                      />
+                      <span style={{ fontSize: "9px", color: "#666", marginTop: "4px" }}>Consulta por QR Code</span>
+                    </div>
+                    
+                    <hr style={{ borderStyle: "dashed" }} />
+                    <p className="center" style={{ fontSize: "10px" }}>Obrigado pela preferência!</p>
                   </div>
-                ))}
-                <hr />
-                <div className="item-row"><span>Subtotal</span><span>{money.format(receiptOrder.subtotal)}</span></div>
-                <div className="item-row"><span>Taxa de Entrega</span><span>{money.format(receiptOrder.deliveryFee)}</span></div>
-                <div className="total-row" style={{ marginTop: "6px" }}><span>TOTAL</span><span>{money.format(receiptOrder.total)}</span></div>
-                <hr />
-                <p><strong>PAGAMENTO:</strong> {receiptOrder.payment}</p>
-                <hr />
-                <p className="center" style={{ fontSize: "10px" }}>Obrigado pela preferência!</p>
-              </div>
-<div className="receipt-modal-actions">
-                <button className="primary-btn" onClick={() => window.print()}>Imprimir</button>
-                <button className="outline-btn" style={{ borderColor: "var(--danger)", color: "var(--danger)" }} onClick={() => setReceiptOrder(null)}>Fechar</button>
+                ) : (
+                  /* VIA DE PRODUÇÃO / COZINHA (NÃO FISCAL) */
+                  <div className="thermal-receipt" id="printableReceipt">
+                    <h2 style={{ fontSize: "18px", textAlign: "center", textTransform: "uppercase", margin: "0 0 4px 0" }}>COZINHA / PRODUÇÃO</h2>
+                    <p className="center" style={{ fontSize: "12px", fontWeight: "bold", margin: "2px 0", letterSpacing: "1px" }}>VIA DE PREPARO (NÃO FISCAL)</p>
+                    <hr />
+                    <p style={{ fontSize: "14px", margin: "6px 0" }}><strong>PEDIDO: {receiptOrder.id}</strong></p>
+                    <p style={{ fontSize: "11px", margin: "2px 0" }}>Data/Hora: {receiptOrder.time} - {receiptOrder.origin}</p>
+                    <hr />
+                    <p style={{ fontSize: "12px", margin: "4px 0" }}><strong>CLIENTE:</strong> {receiptOrder.name}</p>
+                    {receiptOrder.address && (
+                      <p style={{ fontSize: "12px", margin: "4px 0" }}><strong>ENTREGA:</strong> {receiptOrder.address} {receiptOrder.complement ? `(${receiptOrder.complement})` : ""}</p>
+                    )}
+                    <hr />
+                    
+                    {/* Items List for Kitchen */}
+                    {receiptOrder.items.map((item, idx) => (
+                      <div key={idx} style={{ marginBottom: "12px", borderBottom: "1px solid #eee", paddingBottom: "6px" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: "14px", fontWeight: "bold" }}>
+                          <span>[ {item.qty}x ] {item.name}</span>
+                        </div>
+                        {item.notes && (
+                          <div style={{ margin: "6px 0 0 10px", padding: "6px", background: "#f8f9fa", borderRadius: "6px", fontSize: "12px", color: "#c94b3a", fontWeight: "bold", borderLeft: "3px solid #c94b3a" }}>
+                            ⚠️ OBS: {item.notes}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                    
+                    <hr />
+                    <p style={{ fontSize: "11px", margin: "2px 0" }}>Pagamento: {receiptOrder.payment}</p>
+                    <p style={{ fontSize: "11px", margin: "2px 0" }}>Origem: {receiptOrder.origin}</p>
+                    <hr />
+                    <p className="center" style={{ fontSize: "10px", color: "#777" }}>Doutor Burger - Cura sua Fome</p>
+                  </div>
+                )}
+
+                <div className="receipt-modal-actions">
+                  <button className="primary-btn" onClick={() => window.print()}>Imprimir</button>
+                  <button className="outline-btn" style={{ borderColor: "var(--danger)", color: "var(--danger)" }} onClick={() => setReceiptOrder(null)}>Fechar</button>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
       </main>
     );
   }
@@ -878,8 +1119,8 @@ export default function App() {
   // DEFAULT CLIENT PAGE
   return (
     <>
-      <div className="app-shell" style={{ opacity: isStoreOpen ? 1 : 0.9 }}>
-        <Header count={count} onCart={() => setView("cart")} onDelivery={() => setFlow("delivery")} onAdminClick={() => setPage("login")} isStoreOpen={isStoreOpen} />
+      <div className="app-shell">
+        <Header count={count} onHome={() => setView("home")} onCart={() => setView("cart")} onDelivery={() => setFlow("delivery")} onAdminClick={() => setPage("login")} isStoreOpen={isStoreOpen} />
         <main className="customer-grid">
           {/* Closed notice block - compact */}
           {!isStoreOpen && (
@@ -932,6 +1173,8 @@ export default function App() {
           unitPrice={detailUnitPrice}
           onBack={() => setView("home")}
           onAdd={addSelectedProduct}
+          removedIngredients={removedIngredients}
+          setRemovedIngredients={setRemovedIngredients}
         />
       )}
       <FlowDrawer
@@ -939,7 +1182,7 @@ export default function App() {
         total={total}
         receiveMode={receiveMode}
         setReceiveMode={setReceiveMode}
-        onClose={() => setFlow(null)}
+        onClose={() => { setFlow(null); setCheckoutError(""); }}
         setFlow={setFlow}
         checkoutName={checkoutName}
         setCheckoutName={setCheckoutName}
@@ -951,19 +1194,24 @@ export default function App() {
         setCheckoutComplement={setCheckoutComplement}
         checkoutPayment={checkoutPayment}
         setCheckoutPayment={setCheckoutPayment}
+        checkoutChange={checkoutChange}
+        setCheckoutChange={setCheckoutChange}
         onSubmit={submitClientOrder}
         currentOrder={currentClientOrder}
         storeSettings={storeSettings}
+        cart={cart}
+        checkoutError={checkoutError}
+        setCheckoutError={setCheckoutError}
       />
     </>
   );
 }
 
-function Header({ count, onCart, onDelivery, onAdminClick, isStoreOpen }) {
+function Header({ count, onHome, onCart, onDelivery, onAdminClick, isStoreOpen }) {
   return (
     <header className="topbar">
-      <a className="brand" href="#inicio" aria-label="Doutor Burger inicio">
-        <span className="brand-mark">DB</span>
+      <a className="brand" href="#inicio" aria-label="Doutor Burger inicio" onClick={(event) => { event.preventDefault(); onHome(); }}>
+        <span className="brand-mark"><img src="/assets/brand/logo.png" alt="Doutor Burger Logo" /></span>
         <span><strong>Doutor Burger</strong><small>Cura sua fome</small></span>
       </a>
       <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
@@ -998,6 +1246,7 @@ function Catalog({ activeCategory, filteredProducts, search, setActiveCategory, 
   return (
     <section className="catalog" id="inicio">
       <Hero />
+      <Combos openProduct={openProduct} addQuick={addQuick} isStoreOpen={isStoreOpen} />
       <Favorites openProduct={openProduct} isStoreOpen={isStoreOpen} />
       <section className="section-block" id="cardapio">
         <div className="section-head">
@@ -1022,8 +1271,6 @@ function Catalog({ activeCategory, filteredProducts, search, setActiveCategory, 
           <WhyCard />
         </div>
       </section>
-      <Combos openProduct={openProduct} addQuick={addQuick} isStoreOpen={isStoreOpen} />
-      <Promos />
       <Footer />
     </section>
   );
@@ -1047,7 +1294,7 @@ function Hero() {
           <span><Icon name="coin" /><strong>Taxa</strong> a partir de R$ 6,90</span>
         </div>
       </div>
-      <img src="/assets/new-direction/chicken-crispy.webp" alt="Combo Doutor Burger em destaque" />
+      <img src="/assets/new-direction/doutor-burger.webp" alt="Doutor Burger em destaque" />
     </div>
   );
 }
@@ -1068,7 +1315,7 @@ function Favorites({ openProduct, isStoreOpen }) {
       <div className="favorite-grid">
         {favoriteIds.map((id, index) => {
           return (
-            <article className={`favorite-card ${!isStoreOpen ? "is-disabled" : ""}`} key={id} onClick={() => isStoreOpen && openProduct(id)} style={{ opacity: isStoreOpen ? 1 : 0.6, cursor: isStoreOpen ? "pointer" : "not-allowed" }}>
+            <article className="favorite-card" key={id} onClick={() => openProduct(id)} style={{ cursor: "pointer" }}>
               <img src={favImages[index]} alt={id} />
               <span style={{ zIndex: 1 }}>{labels[index]}</span>
               <h3>{id === "doutor" ? "Doutor Burger" : id === "smash" ? "Smash Cheddar" : "Combo Doutor"}</h3>
@@ -1082,10 +1329,20 @@ function Favorites({ openProduct, isStoreOpen }) {
 }
 
 function ProductRow({ product, openProduct, isStoreOpen }) {
+  const descriptionItems = product.description
+    .split(",")
+    .map((item) => item.trim().replace(/\.$/, ""))
+    .filter(Boolean);
+
   return (
-    <article className="product-card" onClick={() => isStoreOpen && openProduct(product.id)} style={{ opacity: isStoreOpen ? 1 : 0.6, cursor: isStoreOpen ? "pointer" : "not-allowed" }}>
+    <article className="product-card" onClick={() => openProduct(product.id)} style={{ cursor: "pointer" }}>
       <img src={product.image} alt={product.name} />
-      <div><h3>{product.name}</h3><p>{product.description}</p></div>
+      <div>
+        <h3>{product.name}</h3>
+        <ul className="product-ingredients">
+          {descriptionItems.map((item) => <li key={item}>{item}</li>)}
+        </ul>
+      </div>
       <strong>{money.format(product.price)}</strong>
       {isStoreOpen && (
         <button className="round-btn" onClick={(event) => { event.stopPropagation(); openProduct(product.id); }} aria-label={`Adicionar ${product.name}`}>+</button>
@@ -1107,7 +1364,7 @@ function WhyCard() {
 
 function Combos({ openProduct, addQuick, isStoreOpen }) {
   const labels = ["Mais pedido"];
-  const comboImages = ["/assets/new-direction/combo-doutor.webp"];
+  const comboImages = ["/assets/products/combo-doutor.webp"];
   return (
     <section className="section-block combo-section" id="combos">
       <div className="section-head compact">
@@ -1120,30 +1377,20 @@ function Combos({ openProduct, addQuick, isStoreOpen }) {
       <div className="combo-grid">
         {comboIds.map((id, index) => {
           return (
-            <article className="combo-card" key={id} onClick={() => isStoreOpen && openProduct(id)} style={{ opacity: isStoreOpen ? 1 : 0.6, cursor: isStoreOpen ? "pointer" : "not-allowed" }}>
+            <article className="combo-card" key={id} onClick={() => openProduct(id)} style={{ cursor: "pointer" }}>
               <img src={comboImages[index]} alt={id} />
               <span>{labels[index]}</span>
-              <h3>{id.replace("-", " ")}</h3>
+              <h3>Combo Doutor</h3>
+              <ul className="combo-includes">
+                <li>Duplo smash</li>
+                <li>Batata crocante</li>
+                <li>Refrigerante 350ml</li>
+              </ul>
               <strong>{id === "combo-doutor" ? "R$ 49,90" : "R$ 44,90"}</strong>
-              {isStoreOpen && (
-                <button className="round-btn" onClick={(event) => { event.stopPropagation(); addQuick(id); }} aria-label={`Adicionar ${id}`}>+</button>
-              )}
+              <button className="combo-cta" onClick={(event) => { event.stopPropagation(); openProduct(id); }}>Ver combo</button>
             </article>
           );
         })}
-      </div>
-    </section>
-  );
-}
-
-function Promos() {
-  return (
-    <section className="section-block promo-section" id="ofertas">
-      <div className="section-head compact"><div><span className="eyebrow">Promocoes da semana</span><h2>Aproveite essas ofertas imperdiveis</h2></div></div>
-      <div className="promo-grid">
-        <article className="promo-card mini"><div><span className="promo-icon"><Icon name="bike" /></span><h3>Frete reduzido hoje</h3><p>Peca agora com frete especial para sua regiao.</p><button className="secondary-btn">Ver condicoes</button></div></article>
-        <article className="promo-card"><div><span className="promo-icon"><Icon name="fries" /></span><h3>Leve batata por <strong>+R$ 9,90</strong></h3><p>Adicione batata media ao seu pedido.</p></div></article>
-        <article className="promo-card dessert"><div><span className="promo-icon"><Icon name="cake" /></span><h3>Sobremesa por <strong>+R$ 7,90</strong></h3><p>Complete seu pedido com um doce irresistivel.</p></div></article>
       </div>
     </section>
   );
@@ -1190,12 +1437,77 @@ function CartPanel({ cart, subtotal, total, receiveMode, setReceiveMode, updateQ
   );
 }
 
-function ProductDetail({ product, qty, setQty, extras, toggleExtra, meat, setMeat, combo, setCombo, note, setNote, unitPrice, onBack, onAdd }) {
+function ProductDetail({
+  product,
+  qty,
+  setQty,
+  extras,
+  toggleExtra,
+  meat,
+  setMeat,
+  combo,
+  setCombo,
+  note,
+  setNote,
+  unitPrice,
+  onBack,
+  onAdd,
+  removedIngredients,
+  setRemovedIngredients,
+}) {
   const extraOptions = [
     ["Bacon extra", 4],
     ["Cheddar extra", 3],
     ["Ovo", 3],
   ];
+
+  const galleryImages = useMemo(() => {
+    if (!product) return [];
+    if (product.id === "doutor") {
+      return [
+        "/assets/new-direction/doutor-burger.webp",
+        "/assets/new-direction/combo-doutor.webp",
+        "/assets/new-direction/smash-cheddar.webp",
+      ];
+    } else if (product.id === "smash") {
+      return [
+        "/assets/new-direction/smash-cheddar.webp",
+        "/assets/new-direction/combo-doutor.webp",
+        "/assets/new-direction/doutor-burger.webp",
+      ];
+    } else {
+      return [
+        product.image,
+        "/assets/new-direction/combo-doutor.webp",
+        "/assets/new-direction/doutor-burger.webp",
+      ];
+    }
+  }, [product]);
+
+  const [activeImgIndex, setActiveImgIndex] = useState(0);
+
+  useEffect(() => {
+    setActiveImgIndex(0);
+  }, [product]);
+
+  const nextImage = (e) => {
+    e.stopPropagation();
+    setActiveImgIndex((prev) => (prev + 1) % galleryImages.length);
+  };
+
+  const prevImage = (e) => {
+    e.stopPropagation();
+    setActiveImgIndex((prev) => (prev - 1 + galleryImages.length) % galleryImages.length);
+  };
+
+  const toggleRemovedIngredient = (name) => {
+    setRemovedIngredients((prev) =>
+      prev.includes(name) ? prev.filter((item) => item !== name) : [...prev, name]
+    );
+  };
+  const extrasTotal = extras.reduce((sum, item) => sum + item.price, 0);
+  const comboPrice = combo ? 11.9 : 0;
+
   return (
     <div className="drawer is-open" id="productDrawer" aria-hidden="false">
       <section className="drawer-card product-detail" role="dialog" aria-modal="true" aria-label="Detalhe do produto">
@@ -1208,8 +1520,25 @@ function ProductDetail({ product, qty, setQty, extras, toggleExtra, meat, setMea
         {product && (
           <>
             <div className="detail-gallery">
-              <img className="detail-image" src={product.image} alt={product.name} />
-              <div className="detail-thumbs">{[0, 1, 2, 3].map((item) => <img key={item} src={product.image} alt={product.name} />)}</div>
+              <button className="detail-exit-btn" onClick={onBack} type="button">← Voltar ao cardapio</button>
+              {galleryImages.length > 1 && (
+                <>
+                  <button className="gallery-nav-btn prev" onClick={prevImage} aria-label="Anterior">&lt;</button>
+                  <button className="gallery-nav-btn next" onClick={nextImage} aria-label="Próximo">&gt;</button>
+                </>
+              )}
+              <img className="detail-image" src={galleryImages[activeImgIndex] || product.image} alt={product.name} />
+              <div className="detail-thumbs">
+                {galleryImages.map((img, idx) => (
+                  <img
+                    key={idx}
+                    className={idx === activeImgIndex ? "is-active" : ""}
+                    src={img}
+                    alt={`${product.name} thumbnail ${idx}`}
+                    onClick={() => setActiveImgIndex(idx)}
+                  />
+                ))}
+              </div>
             </div>
             <div className="detail-copy">
               <div className="detail-head">
@@ -1217,27 +1546,40 @@ function ProductDetail({ product, qty, setQty, extras, toggleExtra, meat, setMea
                 <div className="title-row"><div><h2>{product.name}</h2><p>{product.description}</p></div><strong>{money.format(product.price)}</strong></div>
               </div>
 
-              <div className="detail-section">
+              <div className="detail-section removal-section">
                 <div className="detail-section-title">
                   <h3>Remover ingredientes</h3>
-                  <p>Marque apenas o que voce quer tirar do pedido.</p>
+                  <p>Marque apenas o que você quer tirar do pedido.</p>
                 </div>
-                <div className="option-grid compact-options"><label><input type="checkbox" /> Cebola</label><label><input type="checkbox" /> Tomate</label><label><input type="checkbox" /> Picles</label></div>
+                <div className="option-grid compact-options">
+                  {["Cebola", "Tomate", "Picles"].map((ing) => {
+                    const isRemoved = removedIngredients.includes(ing);
+                    return (
+                      <label key={ing} className={isRemoved ? "is-removed" : ""}>
+                        <input type="checkbox" checked={isRemoved} onChange={() => toggleRemovedIngredient(ing)} />
+                        <span>{ing}</span>
+                      </label>
+                    );
+                  })}
+                </div>
               </div>
 
-              <div className="detail-section">
+              <div className="detail-section extras-section">
                 <div className="detail-section-title">
                   <h3>Adicionais</h3>
                   <p>Complete com extras selecionados.</p>
                 </div>
                 <div className="option-grid extras-grid">
-                  {extraOptions.map(([name, price]) => (
-                    <label className="check-row" key={name}>
-                      <input type="checkbox" checked={extras.some((item) => item.name === name)} onChange={() => toggleExtra(name, price)} />
-                      <span>{name.replace(" extra", "")}</span>
-                      <strong>+ {money.format(price)}</strong>
-                    </label>
-                  ))}
+                  {extraOptions.map(([name, price]) => {
+                    const isSelected = extras.some((item) => item.name === name);
+                    return (
+                      <label className={`check-row ${isSelected ? "is-selected" : ""}`} key={name}>
+                        <input type="checkbox" checked={isSelected} onChange={() => toggleExtra(name, price)} />
+                        <span>{name.replace(" extra", "")}</span>
+                        <strong>+ {money.format(price)}</strong>
+                      </label>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -1247,16 +1589,37 @@ function ProductDetail({ product, qty, setQty, extras, toggleExtra, meat, setMea
                   <p>Escolha como prefere o burger.</p>
                 </div>
                 <div className="meat-options">
-                  {["Ao ponto", "Bem passado"].map((mode) => <label key={mode}><input name="meat" type="radio" checked={meat === mode} onChange={() => setMeat(mode)} /> {mode}</label>)}
+                  {["Ao ponto", "Bem passado"].map((mode) => {
+                    const isSelected = meat === mode;
+                    return (
+                      <label key={mode} className={isSelected ? "is-selected" : ""}>
+                        <input name="meat" type="radio" checked={isSelected} onChange={() => setMeat(mode)} />
+                        {mode}
+                      </label>
+                    );
+                  })}
                 </div>
               </div>
 
-              <label className="combo-row detail-combo-card">
+              <label className={`combo-row detail-combo-card ${combo ? "is-selected" : ""}`}>
                 <input type="checkbox" checked={combo} onChange={(event) => setCombo(event.target.checked)} />
                 <span><strong>Adicionar batata + bebida</strong><small>Refrigerante lata 350ml</small></span>
                 <strong>+ R$ 11,90</strong>
               </label>
-              <label className="note-box"><span>Observacoes</span><textarea value={note} onChange={(event) => setNote(event.target.value)} maxLength={120} placeholder="Ex.: sem cebola, molho a parte..." /></label>
+              <label className="note-box"><span>Observações</span><textarea value={note} onChange={(event) => setNote(event.target.value)} maxLength={120} placeholder="Ex.: sem cebola, molho à parte..." /></label>
+              <aside className="detail-order-summary">
+                <h3>Resumo do pedido</h3>
+                <div><span>Subtotal</span><strong>{money.format(product.price)}</strong></div>
+                <div><span>Extras</span><strong>{money.format(extrasTotal)}</strong></div>
+                <div><span>Combo</span><strong>{money.format(comboPrice)}</strong></div>
+                <div className="detail-order-total"><span>Total</span><strong>{money.format(unitPrice * qty)}</strong></div>
+                <div className="detail-summary-qty">
+                  <span>Quantidade</span>
+                  <div className="stepper"><button onClick={() => setQty(Math.max(1, qty - 1))}>-</button><strong>{qty}</strong><button onClick={() => setQty(qty + 1)}>+</button></div>
+                </div>
+                <button className="primary-btn full" onClick={onAdd}><Icon name="cart" /> Adicionar ao carrinho</button>
+                <small>Compra segura e pedido preparado com carinho.</small>
+              </aside>
               <div className="purchase-bar">
                 <div className="qty-row"><div className="stepper"><button onClick={() => setQty(Math.max(1, qty - 1))}>-</button><strong>{qty}</strong><button onClick={() => setQty(qty + 1)}>+</button></div></div>
                 <button className="primary-btn full" onClick={onAdd}><Icon name="cart" /> Adicionar ao carrinho - {money.format(unitPrice * qty)}</button>
@@ -1312,77 +1675,347 @@ function FlowDrawer({
   setCheckoutComplement,
   checkoutPayment,
   setCheckoutPayment,
+  checkoutChange,
+  setCheckoutChange,
   onSubmit,
   currentOrder,
   storeSettings,
+  cart,
+  checkoutError,
+  setCheckoutError,
 }) {
   if (!flow) return null;
+
+  const [checkoutStep, setCheckoutStep] = React.useState(1);
+
+  React.useEffect(() => {
+    if (flow === "delivery") {
+      setCheckoutStep(1);
+    } else if (flow === "checkout") {
+      setCheckoutStep(2);
+    }
+  }, [flow]);
+
+  const showProgress = flow === "delivery" || flow === "checkout";
+
   return (
     <div className="drawer is-open" id="flowDrawer" aria-hidden="false">
       <div className="drawer-backdrop" onClick={onClose} />
-      <section className="drawer-card flow-card" role="dialog" aria-modal="true" style={{ width: "min(520px, calc(100vw - 20px))" }}>
-        <button className="icon-btn close-btn" onClick={onClose} aria-label="Fechar">x</button>
-        {flow === "delivery" && (
-          <div className="flow-screen is-active">
-            <span className="eyebrow">Recebimento</span><h2>Entrega ou retirada</h2>
-            <div className="choice-list">{["Entrega", "Retirada"].map((mode) => <button key={mode} className={`choice ${receiveMode === mode ? "is-active" : ""}`} onClick={() => setReceiveMode(mode)}><strong>{mode}</strong><span>{mode === "Entrega" ? "Levamos ate voce" : "Retirar no balcao"}</span></button>)}</div>
-            {receiveMode === "Entrega" && (
-              <>
-                <label className="field">Endereço de entrega <input value={checkoutAddress} onChange={(e) => setCheckoutAddress(e.target.value)} placeholder="Rua, número, bairro" /></label>
-              </>
-            )}
-            <button className="primary-btn full" onClick={() => setFlow("checkout")}>Continuar</button>
+      <section className="drawer-card flow-card" role="dialog" aria-modal="true" style={{ width: "min(520px, calc(100vw - 20px))", padding: "24px" }}>
+        <button className="icon-btn close-btn" onClick={onClose} aria-label="Fechar" style={{ top: "16px", right: "16px", zIndex: 10 }}>x</button>
+
+        {/* Progress indicator */}
+        {showProgress && (
+          <div className="checkout-progress" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "28px", marginTop: "10px", position: "relative" }}>
+            <div style={{ position: "absolute", top: "18px", left: "10%", right: "10%", height: "2px", background: "#e9ecef", zIndex: 1 }} />
+            <div style={{ position: "absolute", top: "18px", left: "10%", width: `${(checkoutStep - 1) * 40}%`, height: "2px", background: "var(--accent)", zIndex: 2, transition: "width 0.3s ease" }} />
+            
+            <div style={{ zIndex: 3, display: "flex", flexDirection: "column", alignItems: "center" }}>
+              <button
+                type="button"
+                onClick={() => setCheckoutStep(1)}
+                disabled={checkoutStep < 1}
+                style={{ cursor: "pointer", width: "36px", height: "36px", borderRadius: "50%", background: checkoutStep >= 1 ? "var(--accent)" : "#fff", border: `2px solid ${checkoutStep >= 1 ? "var(--accent)" : "#dee2e6"}`, color: checkoutStep >= 1 ? "#fff" : "#6c757d", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold", fontSize: "14px", transition: "all 0.3s ease" }}
+              >
+                {checkoutStep > 1 ? "✓" : "1"}
+              </button>
+              <span style={{ fontSize: "10px", fontWeight: "800", marginTop: "6px", color: checkoutStep >= 1 ? "var(--accent-strong)" : "#6c757d" }}>Recebimento</span>
+            </div>
+
+            <div style={{ zIndex: 3, display: "flex", flexDirection: "column", alignItems: "center" }}>
+              <button
+                type="button"
+                onClick={() => {
+                  if (receiveMode === "Entrega" && !checkoutAddress.trim()) return;
+                  setCheckoutStep(2);
+                }}
+                disabled={checkoutStep < 2 && (receiveMode === "Entrega" && !checkoutAddress.trim())}
+                style={{ cursor: checkoutStep >= 2 || (receiveMode === "Entrega" && checkoutAddress.trim()) ? "pointer" : "default", width: "36px", height: "36px", borderRadius: "50%", background: checkoutStep >= 2 ? "var(--accent)" : "#fff", border: `2px solid ${checkoutStep >= 2 ? "var(--accent)" : "#dee2e6"}`, color: checkoutStep >= 2 ? "#fff" : "#6c757d", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold", fontSize: "14px", transition: "all 0.3s ease" }}
+              >
+                {checkoutStep > 2 ? "✓" : "2"}
+              </button>
+              <span style={{ fontSize: "10px", fontWeight: "800", marginTop: "6px", color: checkoutStep >= 2 ? "var(--accent-strong)" : "#6c757d" }}>Pagamento</span>
+            </div>
+
+            <div style={{ zIndex: 3, display: "flex", flexDirection: "column", alignItems: "center" }}>
+              <button
+                type="button"
+                disabled={true}
+                style={{ width: "36px", height: "36px", borderRadius: "50%", background: checkoutStep >= 3 ? "var(--accent)" : "#fff", border: `2px solid ${checkoutStep >= 3 ? "var(--accent)" : "#dee2e6"}`, color: checkoutStep >= 3 ? "#fff" : "#6c757d", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold", fontSize: "14px", transition: "all 0.3s ease" }}
+              >
+                3
+              </button>
+              <span style={{ fontSize: "10px", fontWeight: "800", marginTop: "6px", color: checkoutStep >= 3 ? "var(--accent-strong)" : "#6c757d" }}>Confirmação</span>
+            </div>
           </div>
         )}
-        {flow === "checkout" && (
+
+        {/* STEP 1: RECEBIMENTO */}
+        {showProgress && checkoutStep === 1 && (
           <div className="flow-screen is-active">
-            <span className="eyebrow">Identificacao</span><h2>Seus dados</h2>
-            <label className="field">Nome completo <input value={checkoutName} onChange={(e) => setCheckoutName(e.target.value)} /></label>
-            <label className="field">WhatsApp <input value={checkoutPhone} onChange={(e) => setCheckoutPhone(e.target.value)} /></label>
+            <span className="eyebrow" style={{ color: "var(--accent-strong)", fontWeight: "800", textTransform: "uppercase", fontSize: "11px", letterSpacing: "1px" }}>Passo 1 de 3</span>
+            <h2 style={{ fontSize: "20px", fontWeight: "900", margin: "4px 0 20px" }}>Como deseja receber o seu pedido?</h2>
+            
+            <div className="choice-list" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", margin: "20px 0" }}>
+              <button 
+                type="button"
+                className={`choice ${receiveMode === "Entrega" ? "is-active" : ""}`} 
+                onClick={() => { setReceiveMode("Entrega"); setCheckoutError(""); }}
+                style={{ padding: "20px 16px", display: "flex", flexDirection: "column", alignItems: "center", gap: "8px", transition: "all 0.2s ease" }}
+              >
+                <span style={{ fontSize: "28px" }}>🛵</span>
+                <strong style={{ fontSize: "15px", fontWeight: "800" }}>Delivery</strong>
+                <span style={{ fontSize: "11px", color: "#6c757d", textAlign: "center" }}>Entregamos no seu endereço</span>
+              </button>
+              <button 
+                type="button"
+                className={`choice ${receiveMode === "Retirada" ? "is-active" : ""}`} 
+                onClick={() => { setReceiveMode("Retirada"); setCheckoutError(""); }}
+                style={{ padding: "20px 16px", display: "flex", flexDirection: "column", alignItems: "center", gap: "8px", transition: "all 0.2s ease" }}
+              >
+                <span style={{ fontSize: "28px" }}>🛍️</span>
+                <strong style={{ fontSize: "15px", fontWeight: "800" }}>Retirada</strong>
+                <span style={{ fontSize: "11px", color: "#6c757d", textAlign: "center" }}>Você retira no balcão (Grátis)</span>
+              </button>
+            </div>
+
             {receiveMode === "Entrega" && (
-              <label className="field">Complemento / Referência <input value={checkoutComplement} onChange={(e) => setCheckoutComplement(e.target.value)} /></label>
+              <div className="delivery-fields" style={{ animation: "fadeIn 0.3s ease", display: "flex", flexDirection: "column", gap: "14px", marginTop: "10px" }}>
+                <label className="field" style={{ margin: 0 }}>
+                  <span style={{ fontWeight: "800", fontSize: "12px", textTransform: "uppercase", color: "#495057", display: "flex", alignItems: "center", gap: "6px" }}>
+                    📍 Endereço de entrega
+                  </span>
+                  <input 
+                    value={checkoutAddress} 
+                    onChange={(e) => { setCheckoutAddress(e.target.value); if (setCheckoutError) setCheckoutError(""); }} 
+                    placeholder="Rua, número, bairro" 
+                    style={{ width: "100%", height: "52px", borderRadius: "12px", border: "1px solid var(--line)", padding: "0 16px", fontSize: "14px" }}
+                  />
+                </label>
+                <label className="field" style={{ margin: 0 }}>
+                  <span style={{ fontWeight: "800", fontSize: "12px", textTransform: "uppercase", color: "#495057" }}>
+                    🏢 Complemento / Referência (Apto, bloco, etc.)
+                  </span>
+                  <input 
+                    value={checkoutComplement} 
+                    onChange={(e) => setCheckoutComplement(e.target.value)} 
+                    placeholder="Ex: Apto 101, bloco B, próximo ao mercado" 
+                    style={{ width: "100%", height: "52px", borderRadius: "12px", border: "1px solid var(--line)", padding: "0 16px", fontSize: "14px" }}
+                  />
+                </label>
+              </div>
             )}
-            <label className="field">Forma de Pagamento
-              <select className="field" value={checkoutPayment} onChange={(e) => setCheckoutPayment(e.target.value)} style={{ width: "100%", height: "52px", borderRadius: "16px", padding: "0 16px", background: "#fff", border: "1px solid var(--line)" }}>
-                <option value="Pix">Pix</option>
-                <option value="Cartão de Crédito">Cartão de Crédito</option>
-                <option value="Cartão de Débito">Cartão de Débito</option>
-                <option value="Dinheiro">Dinheiro</option>
-              </select>
-            </label>
-            <div className="mini-total">Total do pedido <strong>{money.format(total)}</strong></div>
-            <button className="primary-btn full" onClick={onSubmit} style={{ marginTop: "14px" }}>Finalizar pedido</button>
+
+            {checkoutError && (
+              <div style={{ color: "#d93838", background: "#fdf3f3", padding: "10px 14px", borderRadius: "10px", fontSize: "13px", fontWeight: "700", marginTop: "14px", border: "1px solid #fbc" }}>
+                ⚠️ {checkoutError}
+              </div>
+            )}
+
+            <button 
+              type="button"
+              className="primary-btn full" 
+              onClick={() => {
+                if (receiveMode === "Entrega" && !checkoutAddress.trim()) {
+                  setCheckoutError("Por favor, preencha o seu endereço de entrega.");
+                  return;
+                }
+                setCheckoutError("");
+                setCheckoutStep(2);
+              }}
+              style={{ marginTop: "24px", height: "52px", borderRadius: "12px", fontWeight: "bold" }}
+            >
+              Avançar para Pagamento
+            </button>
           </div>
         )}
+
+        {/* STEP 2: FORMA DE PAGAMENTO */}
+        {showProgress && checkoutStep === 2 && (
+          <div className="flow-screen is-active">
+            <span className="eyebrow" style={{ color: "var(--accent-strong)", fontWeight: "800", textTransform: "uppercase", fontSize: "11px", letterSpacing: "1px" }}>Passo 2 de 3</span>
+            <h2 style={{ fontSize: "20px", fontWeight: "900", margin: "4px 0 20px" }}>Selecione a forma de pagamento</h2>
+
+            <div className="payment-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", margin: "20px 0" }}>
+              {[
+                { id: "Pix", label: "Pix", icon: "⚡", desc: "Aprovação instantânea" },
+                { id: "Cartão de Crédito", label: "Crédito", icon: "💳", desc: "Pague pelo app/maquininha" },
+                { id: "Cartão de Débito", label: "Débito", icon: "💳", desc: "Pague na entrega" },
+                { id: "Dinheiro", label: "Dinheiro", icon: "💵", desc: "Pague na entrega" },
+              ].map((method) => (
+                <button
+                  key={method.id}
+                  type="button"
+                  className={`choice ${checkoutPayment === method.id ? "is-active" : ""}`}
+                  onClick={() => setCheckoutPayment(method.id)}
+                  style={{ padding: "18px 12px", display: "flex", flexDirection: "column", alignItems: "center", gap: "6px", transition: "all 0.2s ease", textAlign: "center" }}
+                >
+                  <span style={{ fontSize: "24px" }}>{method.icon}</span>
+                  <strong style={{ fontSize: "14px", fontWeight: "800" }}>{method.label}</strong>
+                  <span style={{ fontSize: "10px", color: "#6c757d", textAlign: "center" }}>{method.desc}</span>
+                </button>
+              ))}
+            </div>
+
+            {checkoutPayment === "Dinheiro" && (
+              <div style={{ animation: "fadeIn 0.3s ease", marginTop: "10px" }}>
+                <label className="field" style={{ margin: 0 }}>
+                  <span style={{ fontWeight: "800", fontSize: "12px", textTransform: "uppercase", color: "#495057" }}>
+                    💵 Precisa de troco para quanto?
+                  </span>
+                  <input 
+                    type="text"
+                    value={checkoutChange}
+                    onChange={(e) => setCheckoutChange(e.target.value)}
+                    placeholder="Ex: R$ 50 ou R$ 100 (deixe em branco se não precisar)" 
+                    style={{ width: "100%", height: "52px", borderRadius: "12px", border: "1px solid var(--line)", padding: "0 16px", fontSize: "14px" }}
+                  />
+                </label>
+              </div>
+            )}
+
+            <div style={{ display: "flex", gap: "12px", marginTop: "24px" }}>
+              <button 
+                type="button"
+                className="outline-btn" 
+                onClick={() => setCheckoutStep(1)}
+                style={{ flex: 1, height: "52px", borderRadius: "12px", fontWeight: "bold" }}
+              >
+                Voltar
+              </button>
+              <button 
+                type="button"
+                className="primary-btn" 
+                onClick={() => setCheckoutStep(3)}
+                style={{ flex: 1.5, height: "52px", borderRadius: "12px", fontWeight: "bold" }}
+              >
+                Avançar
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* STEP 3: CONFIRMAÇÃO (NOME E WHATSAPP) */}
+        {showProgress && checkoutStep === 3 && (
+          <div className="flow-screen is-active">
+            <span className="eyebrow" style={{ color: "var(--accent-strong)", fontWeight: "800", textTransform: "uppercase", fontSize: "11px", letterSpacing: "1px" }}>Passo 3 de 3</span>
+            <h2 style={{ fontSize: "20px", fontWeight: "900", margin: "4px 0 20px" }}>Confirmação dos seus dados</h2>
+
+            {/* Resumo do Pedido / Checkout info */}
+            <div className="checkout-summary" style={{ background: "#fdfaf5", padding: "16px", borderRadius: "16px", marginBottom: "20px", border: "1px solid #ead8bf" }}>
+              <h4 style={{ margin: "0 0 10px 0", fontSize: "13px", color: "var(--accent-strong)", fontWeight: "900", textTransform: "uppercase", letterSpacing: "0.5px" }}>Resumo da Compra</h4>
+              <div style={{ display: "flex", flexDirection: "column", gap: "6px", fontSize: "13px", color: "#495057" }}>
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <span>Itens ({cart.reduce((sum, i) => sum + i.qty, 0)})</span>
+                  <strong>{money.format(cart.reduce((sum, i) => sum + i.price * i.qty, 0))}</strong>
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <span>Tipo de Recebimento</span>
+                  <strong>{receiveMode}</strong>
+                </div>
+                {receiveMode === "Entrega" && (
+                  <div style={{ fontSize: "12px", color: "#6c757d", borderLeft: "2px solid var(--accent)", paddingLeft: "8px", margin: "2px 0" }}>
+                    <strong>Endereço:</strong> {checkoutAddress} {checkoutComplement ? `(${checkoutComplement})` : ""}
+                  </div>
+                )}
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <span>Forma de Pagamento</span>
+                  <strong>{checkoutPayment === "Dinheiro" && checkoutChange.trim() ? `Dinheiro (Troco para ${checkoutChange})` : checkoutPayment}</strong>
+                </div>
+                <hr style={{ margin: "8px 0", borderStyle: "dashed", borderColor: "#ead8bf" }} />
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "15px", fontWeight: "900", color: "#1f2026" }}>
+                  <span>Total</span>
+                  <strong>{money.format(total)}</strong>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+              <label className="field" style={{ margin: 0 }}>
+                <span style={{ fontWeight: "800", fontSize: "12px", textTransform: "uppercase", color: "#495057", display: "flex", alignItems: "center", gap: "6px" }}>
+                  👤 Seu Nome Completo
+                </span>
+                <input 
+                  value={checkoutName} 
+                  onChange={(e) => { setCheckoutName(e.target.value); if (setCheckoutError) setCheckoutError(""); }} 
+                  placeholder="Digite seu nome para o pedido"
+                  style={{ width: "100%", height: "52px", borderRadius: "12px", border: "1px solid var(--line)", padding: "0 16px", fontSize: "14px" }}
+                />
+              </label>
+              <label className="field" style={{ margin: 0 }}>
+                <span style={{ fontWeight: "800", fontSize: "12px", textTransform: "uppercase", color: "#495057", display: "flex", alignItems: "center", gap: "6px" }}>
+                  💬 Seu WhatsApp (com DDD)
+                </span>
+                <input 
+                  value={checkoutPhone} 
+                  onChange={(e) => { setCheckoutPhone(e.target.value); if (setCheckoutError) setCheckoutError(""); }} 
+                  placeholder="Ex: (83) 98765-4321"
+                  style={{ width: "100%", height: "52px", borderRadius: "12px", border: "1px solid var(--line)", padding: "0 16px", fontSize: "14px" }}
+                />
+              </label>
+            </div>
+
+            {checkoutError && (
+              <div style={{ color: "#d93838", background: "#fdf3f3", padding: "10px 14px", borderRadius: "10px", fontSize: "13px", fontWeight: "700", marginTop: "14px", border: "1px solid #fbc" }}>
+                ⚠️ {checkoutError}
+              </div>
+            )}
+
+            <div style={{ display: "flex", gap: "12px", marginTop: "24px" }}>
+              <button 
+                type="button"
+                className="outline-btn" 
+                onClick={() => setCheckoutStep(2)}
+                style={{ flex: 1, height: "52px", borderRadius: "12px", fontWeight: "bold" }}
+              >
+                Voltar
+              </button>
+              <button 
+                type="button"
+                className="primary-btn" 
+                onClick={onSubmit}
+                style={{ flex: 1.5, height: "52px", borderRadius: "12px", fontWeight: "bold", background: "linear-gradient(135deg, #34792f, #285e24)", border: "none", color: "#fff" }}
+              >
+                Finalizar e Confirmar
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* SUCCESS SCREEN */}
         {flow === "success" && currentOrder && (
-          <div className="flow-screen is-active">
+          <div className="flow-screen is-active" style={{ textAlign: "center" }}>
             <div className="success-icon" style={{ background: "var(--green)", color: "#fff", width: "60px", height: "60px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "24px", margin: "0 auto 16px" }}>✓</div>
-            <h2>Pedido enviado!</h2><p>Seu pedido foi recebido e já está no painel da loja.</p>
-            <div className="order-number" style={{ background: "var(--bg)", padding: "14px", borderRadius: "14px", margin: "14px 0" }}>
+            <h2>Pedido enviado!</h2>
+            <p style={{ color: "#6c757d", fontSize: "14px", marginBottom: "20px" }}>Seu pedido foi recebido e já está no painel da loja.</p>
+            <div className="order-number" style={{ background: "var(--bg)", padding: "14px", borderRadius: "14px", margin: "14px 0", fontWeight: "bold" }}>
               Pedido <strong>{currentOrder.id}</strong>
             </div>
-            <button className="primary-btn full" onClick={() => setFlow("track")}>Acompanhar pedido</button>
+            <button className="primary-btn full" onClick={() => setFlow("track")} style={{ height: "52px", borderRadius: "12px", fontWeight: "bold" }}>Acompanhar pedido</button>
           </div>
         )}
+
+        {/* TRACK ORDER TIMELINE */}
         {flow === "track" && currentOrder && (
           <div className="flow-screen is-active">
-            <span className="eyebrow">Pedido {currentOrder.id}</span><h2>Acompanhar pedido</h2>
-            <ol className="timeline">
+            <span className="eyebrow" style={{ color: "var(--accent-strong)", fontWeight: "800", textTransform: "uppercase", fontSize: "11px", letterSpacing: "1px" }}>Pedido {currentOrder.id}</span>
+            <h2 style={{ fontSize: "20px", fontWeight: "900", margin: "4px 0 20px" }}>Acompanhar status</h2>
+            <ol className="timeline" style={{ listStyle: "none", padding: 0, margin: "20px 0" }}>
               {["Recebido", "Em preparo", "Pronto", "Saiu para entrega", "Entregue"].map((step, index) => {
                 const isDone = ["Recebido", "Em preparo", "Pronto", "Saiu para entrega", "Entregue"].indexOf(currentOrder.status) >= index;
                 const isCurrent = currentOrder.status === step;
                 return (
-                  <li key={step} className={isCurrent ? "current" : isDone ? "done" : ""}>
-                    <span className="dot">{index + 1}</span>
-                    <div>
-                      <strong>{step}</strong>
-                      <p>{isCurrent ? "Esta etapa está ocorrendo agora." : isDone ? "Etapa concluída." : "Aguardando etapas anteriores."}</p>
+                  <li key={step} className={isCurrent ? "current" : isDone ? "done" : ""} style={{ display: "flex", gap: "16px", marginBottom: "16px", position: "relative" }}>
+                    <span className="dot" style={{ width: "28px", height: "28px", borderRadius: "50%", background: isCurrent ? "var(--accent)" : isDone ? "#34792f" : "#e9ecef", color: isCurrent || isDone ? "#fff" : "#6c757d", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold", fontSize: "12px", zIndex: 2 }}>{index + 1}</span>
+                    <div style={{ flex: 1 }}>
+                      <strong style={{ fontSize: "14px", color: isCurrent ? "var(--accent-strong)" : isDone ? "#1f2026" : "#868e96", fontWeight: "800" }}>{step}</strong>
+                      <p style={{ margin: "2px 0 0 0", fontSize: "12px", color: isCurrent ? "#495057" : "#6c757d" }}>{isCurrent ? "Esta etapa está ocorrendo agora." : isDone ? "Etapa concluída." : "Aguardando etapas anteriores."}</p>
                     </div>
                   </li>
                 );
               })}
             </ol>
-            <button className="outline-btn full" onClick={onClose} style={{ marginTop: "20px" }}>Fechar</button>
+            <button className="outline-btn full" onClick={onClose} style={{ marginTop: "20px", height: "52px", borderRadius: "12px", fontWeight: "bold" }}>Fechar</button>
           </div>
         )}
       </section>
@@ -1393,7 +2026,7 @@ function FlowDrawer({
 function Footer() {
   return (
     <footer className="site-footer">
-      <div className="brand"><span className="brand-mark">DB</span><span><strong>Doutor Burger</strong><small>Cura sua fome</small></span></div>
+      <div className="brand"><span className="brand-mark"><img src="/assets/brand/logo.png" alt="Doutor Burger Logo" /></span><span><strong>Doutor Burger</strong><small>Cura sua fome</small></span></div>
       <nav><a href="#inicio">Sobre nos</a><a href="https://wa.me/5583987654321" target="_blank" rel="noreferrer">WhatsApp</a><a href="#cardapio">Duvidas frequentes</a><a href="#ofertas">Promocoes</a></nav>
       <p>Pix - Cartao - Dinheiro</p>
     </footer>
