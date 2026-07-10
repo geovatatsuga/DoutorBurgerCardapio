@@ -6689,3 +6689,53 @@ body.detail-mode .detail-copy > .purchase-bar {
     grid-template-columns: 132px minmax(0, 1fr) !important;
   }
 }
+
+/* Mobile menu conversion: quick-add stays in the menu and cart is one tap away. */
+@media (max-width: 760px) {
+  .product-card {
+    grid-template-columns: 76px minmax(0, 1fr) 44px !important;
+    grid-template-rows: minmax(0, 1fr) auto !important;
+    min-height: 128px !important;
+  }
+
+  .product-card > div {
+    align-self: center !important;
+    display: block !important;
+    min-height: 0 !important;
+  }
+
+  .product-card h3 { font-size: 17px !important; margin: 0 0 5px !important; }
+  .product-card .product-ingredients { gap: 0 !important; line-height: 1.25 !important; }
+  .product-card > strong { font-size: 17px !important; line-height: 1.1 !important; }
+
+  .mobile-cart-bar {
+    align-items: center;
+    background: #25211d;
+    border: 0;
+    border-radius: 14px;
+    bottom: calc(74px + env(safe-area-inset-bottom));
+    box-shadow: 0 12px 28px rgba(34, 24, 14, .24);
+    color: #fff;
+    cursor: pointer;
+    display: flex;
+    font: inherit;
+    gap: 12px;
+    justify-content: space-between;
+    left: 14px;
+    min-height: 54px;
+    padding: 0 16px;
+    position: fixed;
+    right: 14px;
+    z-index: 39;
+  }
+
+  .mobile-cart-bar span {
+    align-items: center;
+    display: inline-flex;
+    font-size: 13px;
+    font-weight: 800;
+    gap: 7px;
+  }
+
+  .mobile-cart-bar strong { color: #ffb11a; font-size: 14px; }
+}

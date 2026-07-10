@@ -1122,6 +1122,12 @@ _Pedido enviado via Cardápio Digital!_`;
             />
           )}
         </main>
+        {view === "home" && count > 0 && (
+          <button className="mobile-cart-bar" onClick={() => setView("cart")}>
+            <span><Icon name="cart" /> {count} {count === 1 ? "item" : "itens"}</span>
+            <strong>Ver carrinho · {money.format(subtotal)}</strong>
+          </button>
+        )}
         <BottomNav count={count} onCart={() => setView("cart")} onTrack={() => setFlow("track")} />
       </div>
 
@@ -1232,7 +1238,7 @@ function Catalog({ activeCategory, filteredProducts, search, setActiveCategory, 
           <div className="menu-column">
             <div className="product-list">
               {filteredProducts.length ? filteredProducts.map((product) => (
-                <ProductRow key={product.id} product={product} openProduct={openProduct} isStoreOpen={isStoreOpen} />
+                <ProductRow key={product.id} product={product} openProduct={openProduct} addQuick={addQuick} isStoreOpen={isStoreOpen} />
               )) : <div className="notice">Nenhum produto encontrado ou pausado.</div>}
             </div>
           </div>
@@ -1296,7 +1302,7 @@ function Favorites({ openProduct, isStoreOpen }) {
   );
 }
 
-function ProductRow({ product, openProduct, isStoreOpen }) {
+function ProductRow({ product, openProduct, addQuick, isStoreOpen }) {
   const descriptionItems = product.description
     .split(",")
     .map((item) => item.trim().replace(/\.$/, ""))
@@ -1316,7 +1322,7 @@ function ProductRow({ product, openProduct, isStoreOpen }) {
       </div>
       <strong>{money.format(product.price)}</strong>
       {isStoreOpen && (
-        <button className="round-btn" onClick={(event) => { event.stopPropagation(); openProduct(product.id); }} aria-label={`Adicionar ${product.name}`}>+</button>
+        <button className="round-btn" onClick={(event) => { event.stopPropagation(); addQuick(product.id); }} aria-label={`Adicionar ${product.name} ao carrinho`}>+</button>
       )}
     </article>
   );
