@@ -174,7 +174,7 @@ export default function App() {
       minOrder: 20,
       deliveryTime: "35-45 min",
       deliveryFee: 6.9,
-      address: "Auto do Mateus, Joao Pessoa - PB",
+      address: "Rua Clotilde Torres, 116-B, Casa - Alto do Mateus, Joao Pessoa - PB, CEP 58090-240",
       openDays: [0, 2, 3, 4, 5, 6],
       openHour: "18:00",
       closeHour: "23:30",
@@ -973,7 +973,7 @@ _Pedido enviado via Cardápio Digital!_`;
                     onClick={() => setReceiptType("fiscal")}
                     style={{ flex: 1, padding: "8px 12px", fontSize: "12px", border: "none", margin: 0, borderRadius: "6px" }}
                   >
-                    📄 Via do Cliente (NFC-e)
+                    Via do Cliente
                   </button>
                   <button 
                     className={receiptType === "cozinha" ? "primary-btn" : "outline-btn"} 
@@ -985,87 +985,55 @@ _Pedido enviado via Cardápio Digital!_`;
                 </div>
 
                 {receiptType === "fiscal" ? (
-                  /* SIMULATED CLIENT FISCAL COUPON (DANFE NFC-e) */
+                  /* COMPROVANTE DO CLIENTE - MEI */
                   <div className="thermal-receipt" id="printableReceipt">
-                    <h2 style={{ fontSize: "15px", textAlign: "center", textTransform: "uppercase", margin: "0 0 4px 0" }}>{storeSettings.name} LTDA</h2>
-                    <p className="center" style={{ fontSize: "11px", margin: "2px 0" }}>CNPJ: 12.345.678/0001-90 | I.E.: 987.654.321.110</p>
-                    <p className="center" style={{ fontSize: "11px", margin: "2px 0" }}>{storeSettings.address}</p>
+                    <h2 style={{ fontSize: "15px", textAlign: "center", textTransform: "uppercase", margin: "0 0 4px 0" }}>DOUTOR BURGER</h2>
+                    <p className="center" style={{ fontSize: "11px", margin: "2px 0" }}>CNPJ: 67.929.090/0001-70</p>
+                    <p className="center" style={{ fontSize: "10px", margin: "2px 0" }}>MEI - Proprietario de lanchonete</p>
+                    <p className="center" style={{ fontSize: "10px", margin: "2px 0" }}>CNAE 5611-2/03 - Lanchonetes e similares</p>
+                    <p className="center" style={{ fontSize: "10px", margin: "2px 0" }}>Rua Clotilde Torres, 116-B, Casa</p>
+                    <p className="center" style={{ fontSize: "10px", margin: "2px 0" }}>Alto do Mateus - Joao Pessoa/PB - CEP 58090-240</p>
                     <hr style={{ borderStyle: "dashed" }} />
-                    <p className="center" style={{ fontSize: "11px", fontWeight: "bold", margin: "4px 0" }}>
-                      DANFE NFC-e - Documento Auxiliar da Nota Fiscal de Consumidor Eletrônica
-                    </p>
-                    <p className="center" style={{ fontSize: "10px", margin: "2px 0" }}>
-                      Não permite aproveitamento de crédito de ICMS
-                    </p>
+                    <p className="center" style={{ fontSize: "11px", fontWeight: "bold", margin: "4px 0" }}>COMPROVANTE DE PEDIDO</p>
+                    <p className="center" style={{ fontSize: "9px", margin: "2px 0" }}>Documento sem valor fiscal</p>
                     <hr style={{ borderStyle: "dashed" }} />
-                    
-                    {/* Table Header */}
-                    <div style={{ display: "grid", gridTemplateColumns: "20px 1fr 30px 45px 45px", fontSize: "11px", fontWeight: "bold", marginBottom: "4px" }}>
-                      <span>Cód</span>
-                      <span>Descrição</span>
+
+                    <p style={{ fontSize: "10px", margin: "2px 0" }}><strong>PEDIDO: {receiptOrder.id}</strong></p>
+                    <p style={{ fontSize: "10px", margin: "2px 0" }}>EMISSAO: {receiptOrder.time} - {receiptOrder.origin}</p>
+                    <p style={{ fontSize: "10px", margin: "2px 0" }}>CLIENTE: {receiptOrder.name}</p>
+                    <p style={{ fontSize: "10px", margin: "2px 0" }}>TELEFONE: {receiptOrder.phone}</p>
+                    <p style={{ fontSize: "10px", margin: "2px 0" }}>ENTREGA: {receiptOrder.address}{receiptOrder.complement ? ` - ${receiptOrder.complement}` : ""}</p>
+                    <hr style={{ borderStyle: "dashed" }} />
+
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 30px 48px 52px", fontSize: "11px", fontWeight: "bold", marginBottom: "4px" }}>
+                      <span>Item</span>
                       <span style={{ textAlign: "right" }}>Qtd</span>
                       <span style={{ textAlign: "right" }}>V.Unit</span>
                       <span style={{ textAlign: "right" }}>Total</span>
                     </div>
 
-                    {/* Items List */}
                     {receiptOrder.items.map((item, idx) => (
                       <div key={idx} style={{ fontSize: "11px", marginBottom: "4px" }}>
-                        <div style={{ display: "grid", gridTemplateColumns: "20px 1fr 30px 45px 45px" }}>
-                          <span>{String(idx + 1).padStart(3, "0")}</span>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 30px 48px 52px" }}>
                           <span>{item.name}</span>
                           <span style={{ textAlign: "right" }}>{item.qty} UN</span>
                           <span style={{ textAlign: "right" }}>{money.format(item.price).replace("R$", "").trim()}</span>
                           <span style={{ textAlign: "right" }}>{money.format(item.price * item.qty).replace("R$", "").trim()}</span>
                         </div>
-                        {item.notes && <p style={{ margin: "2px 0 0 20px", fontSize: "10px", color: "#555", fontStyle: "italic" }}>- {item.notes}</p>}
+                        {item.notes && <p style={{ margin: "2px 0 0 0", fontSize: "10px", color: "#555", fontStyle: "italic" }}>- {item.notes}</p>}
                       </div>
                     ))}
-                    
+
                     <hr style={{ borderStyle: "dashed" }} />
                     <div className="item-row" style={{ fontSize: "12px" }}><span>Qtd. Total de Itens</span><span>{receiptOrder.items.reduce((sum, i) => sum + i.qty, 0)}</span></div>
                     <div className="item-row" style={{ fontSize: "12px" }}><span>Subtotal</span><span>{money.format(receiptOrder.subtotal)}</span></div>
                     <div className="item-row" style={{ fontSize: "12px" }}><span>Taxa de Entrega</span><span>{money.format(receiptOrder.deliveryFee)}</span></div>
                     <div className="total-row" style={{ marginTop: "4px", fontSize: "14px" }}><span>VALOR A PAGAR</span><span>{money.format(receiptOrder.total)}</span></div>
                     <hr style={{ borderStyle: "dashed" }} />
-                    
-                    <div className="item-row" style={{ fontSize: "12px" }}><span>FORMA DE PAGAMENTO</span><span>VALOR PAGO</span></div>
-                    <div className="item-row" style={{ fontSize: "12px", fontWeight: "bold" }}><span>{receiptOrder.payment}</span><span>{money.format(receiptOrder.total)}</span></div>
+                    <div className="item-row" style={{ fontSize: "12px" }}><span>Pagamento</span><span>{receiptOrder.payment}</span></div>
                     <hr style={{ borderStyle: "dashed" }} />
-                    
-                    {/* IBPT Taxes Calculation */}
-                    <div style={{ fontSize: "10px", lineHeight: "1.3", color: "#333", padding: "4px 0" }}>
-                      Informação dos Tributos Totais Incidentes (Lei Federal 12.741/2012):<br />
-                      Tributos Estaduais (ICMS ~12%): {money.format(receiptOrder.subtotal * 0.12)}<br />
-                      Tributos Federais (PIS/COFINS ~4.2%): {money.format(receiptOrder.subtotal * 0.042)}<br />
-                      Valor Estimado de Impostos: <strong>{money.format(receiptOrder.subtotal * 0.162)} (16.2%)</strong><br />
-                      Fonte: IBPT / Fecomercio
-                    </div>
-                    <hr style={{ borderStyle: "dashed" }} />
-
-                    {/* NFC-e electronic coupon details */}
-                    <p style={{ fontSize: "10px", margin: "2px 0" }}><strong>PEDIDO: {receiptOrder.id}</strong></p>
-                    <p style={{ fontSize: "10px", margin: "2px 0" }}>EMISSÃO: {receiptOrder.time} - {receiptOrder.origin}</p>
-                    <p style={{ fontSize: "10px", margin: "2px 0" }}>CLIENTE: {receiptOrder.name} ({receiptOrder.phone})</p>
-                    <p style={{ fontSize: "10px", margin: "2px 0" }}>ENDEREÇO: {receiptOrder.address} {receiptOrder.complement ? ` - ${receiptOrder.complement}` : ""}</p>
-                    <p style={{ fontSize: "10px", margin: "4px 0 2px", fontWeight: "bold" }}>CHAVE DE ACESSO PARA CONSULTA:</p>
-                    <p style={{ fontSize: "9px", fontFamily: "monospace", letterSpacing: "1px", margin: "2px 0", textAlign: "center" }}>
-                      {formattedAccessKey}
-                    </p>
-                    <p className="center" style={{ fontSize: "9px", margin: "4px 0 8px" }}>Protocolo de Autorização: 13226084920{receiptOrder.id.replace(/\D/g, "").slice(0, 4)}</p>
-                    
-                    {/* Real Dynamic QR Code from Public API */}
-                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", margin: "10px 0" }}>
-                      <img 
-                        src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(`https://www.sefaz.pb.gov.br/nfce/consulta?chNFe=${accessKey}`)}`}
-                        alt="Consulta QR Code"
-                        style={{ background: "#fff", padding: "4px", border: "1px solid #ddd", width: "100px", height: "100px" }}
-                      />
-                      <span style={{ fontSize: "9px", color: "#666", marginTop: "4px" }}>Consulta por QR Code</span>
-                    </div>
-                    
-                    <hr style={{ borderStyle: "dashed" }} />
-                    <p className="center" style={{ fontSize: "10px" }}>Obrigado pela preferência!</p>
+                    <p className="center" style={{ fontSize: "9px", lineHeight: "1.3", margin: "4px 0" }}>Para emissao de nota fiscal, solicite ao estabelecimento.</p>
+                    <p className="center" style={{ fontSize: "10px" }}>Obrigado pela preferencia!</p>
                   </div>
                 ) : (
                   /* VIA DE PRODUÇÃO / COZINHA (NÃO FISCAL) */
@@ -1333,14 +1301,17 @@ function ProductRow({ product, openProduct, isStoreOpen }) {
     .split(",")
     .map((item) => item.trim().replace(/\.$/, ""))
     .filter(Boolean);
+  const visibleIngredients = descriptionItems.slice(0, 3);
+  const remainingIngredients = descriptionItems.length - visibleIngredients.length;
 
   return (
     <article className="product-card" onClick={() => openProduct(product.id)} style={{ cursor: "pointer" }}>
       <img src={product.image} alt={product.name} />
       <div>
         <h3>{product.name}</h3>
-        <ul className="product-ingredients">
-          {descriptionItems.map((item) => <li key={item}>{item}</li>)}
+        <ul className="product-ingredients" aria-label="Principais ingredientes">
+          {visibleIngredients.map((item) => <li key={item}>{item}</li>)}
+          {remainingIngredients > 0 && <li className="more-ingredients">+{remainingIngredients} ingredientes</li>}
         </ul>
       </div>
       <strong>{money.format(product.price)}</strong>
@@ -1621,7 +1592,7 @@ function ProductDetail({
                 <small>Compra segura e pedido preparado com carinho.</small>
               </aside>
               <div className="purchase-bar">
-                <div className="qty-row"><div className="stepper"><button onClick={() => setQty(Math.max(1, qty - 1))}>-</button><strong>{qty}</strong><button onClick={() => setQty(qty + 1)}>+</button></div></div>
+                <div className="qty-row"><div className="stepper"><button aria-label="Diminuir quantidade" onClick={() => setQty(Math.max(1, qty - 1))}>-</button><strong>{qty}</strong><button aria-label="Aumentar quantidade" onClick={() => setQty(qty + 1)}>+</button></div></div>
                 <button className="primary-btn full" onClick={onAdd}><Icon name="cart" /> Adicionar ao carrinho - {money.format(unitPrice * qty)}</button>
               </div>
             </div>
@@ -1756,7 +1727,7 @@ function FlowDrawer({
             <span className="eyebrow" style={{ color: "var(--accent-strong)", fontWeight: "800", textTransform: "uppercase", fontSize: "11px", letterSpacing: "1px" }}>Passo 1 de 3</span>
             <h2 style={{ fontSize: "20px", fontWeight: "900", margin: "4px 0 20px" }}>Como deseja receber o seu pedido?</h2>
             
-            <div className="choice-list" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", margin: "20px 0" }}>
+            <div className="choice-list checkout-choice-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", margin: "20px 0" }}>
               <button 
                 type="button"
                 className={`choice ${receiveMode === "Entrega" ? "is-active" : ""}`} 
@@ -1836,7 +1807,7 @@ function FlowDrawer({
             <span className="eyebrow" style={{ color: "var(--accent-strong)", fontWeight: "800", textTransform: "uppercase", fontSize: "11px", letterSpacing: "1px" }}>Passo 2 de 3</span>
             <h2 style={{ fontSize: "20px", fontWeight: "900", margin: "4px 0 20px" }}>Selecione a forma de pagamento</h2>
 
-            <div className="payment-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", margin: "20px 0" }}>
+            <div className="payment-grid checkout-choice-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", margin: "20px 0" }}>
               {[
                 { id: "Pix", label: "Pix", icon: "⚡", desc: "Aprovação instantânea" },
                 { id: "Cartão de Crédito", label: "Crédito", icon: "💳", desc: "Pague pelo app/maquininha" },
