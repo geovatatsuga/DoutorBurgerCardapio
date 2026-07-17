@@ -674,6 +674,46 @@ _Pedido enviado via Cardápio Digital!_`;
     updateOrderStatus(id, "Cancelado");
   }
 
+  async function saveStoreSettings() {
+    if (!supabase || !activeStoreId) {
+      alert("Supabase ainda nao carregado. Tente novamente em alguns segundos.");
+      return;
+    }
+
+    const { error: storeError } = await supabase
+      .from("stores")
+      .update({
+        name: storeSettings.name,
+        phone: storeSettings.phone,
+        min_order_cents: Math.round(Number(storeSettings.minOrder || 0) * 100),
+      })
+      .eq("id", activeStoreId);
+
+    if (storeError) {
+      alert(storeError.message);
+      return;
+    }
+
+    const hoursPayload = Array.from({ length: 7 }, (_, day) => ({
+      store_id: activeStoreId,
+      day_of_week: day,
+      opens_at: storeSettings.openHour || "18:00",
+      closes_at: storeSettings.closeHour || "23:30",
+      is_open: storeSettings.openDays.includes(day),
+    }));
+
+    const { error: hoursError } = await supabase
+      .from("store_hours")
+      .upsert(hoursPayload, { onConflict: "store_id,day_of_week" });
+
+    if (hoursError) {
+      alert(hoursError.message);
+      return;
+    }
+
+    alert("Configuracoes da loja salvas.");
+  }
+
   async function handleSignUp() {
     if (!supabase) {
       setLoginError("Configure VITE_SUPABASE_URL e VITE_SUPABASE_PUBLISHABLE_KEY para cadastro.");
@@ -1176,6 +1216,7 @@ _Pedido enviado via Cardápio Digital!_`;
                   <label className="field">Pedido Mínimo 
                     <input type="number" value={storeSettings.minOrder} onChange={(e) => setStoreSettings({ ...storeSettings, minOrder: parseFloat(e.target.value) || 0 })} />
                   </label>
+                  <button className="primary-btn full" type="button" onClick={saveStoreSettings}>Salvar configurações</button>
                 </article>
                 <article className="settings-card">
                   <h2>Horário de Funcionamento</h2>
@@ -1204,6 +1245,7 @@ _Pedido enviado via Cardápio Digital!_`;
                       </label>
                     ))}
                   </div>
+                  <button className="primary-btn full" type="button" style={{ marginTop: "18px" }} onClick={saveStoreSettings}>Salvar horários</button>
                 </article>
               </div>
             </section>
