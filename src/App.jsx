@@ -215,6 +215,14 @@ export default function App() {
     const local = localStorage.getItem("doutor_products");
     return local ? JSON.parse(local) : initialProducts;
   });
+  const [menuCategories, setMenuCategories] = useState(categories.map((name, index) => ({
+    id: name,
+    name,
+    icon: categoryIcons[name] || "burger",
+    sort_order: (index + 1) * 10,
+    is_active: true,
+  })));
+  const categoryNames = menuCategories.filter((category) => category.is_active !== false).map((category) => category.name);
 
   const [orders, setOrders] = useState(() => {
     const local = localStorage.getItem("doutor_orders");
@@ -274,7 +282,22 @@ export default function App() {
   const [productFormCategory, setProductFormCategory] = useState("Burgers");
   const [productFormPrice, setProductFormPrice] = useState("");
   const [productFormDesc, setProductFormDesc] = useState("");
+  const [productFormImage, setProductFormImage] = useState("");
   const [productFormActive, setProductFormActive] = useState(true);
+  const [categoryFormName, setCategoryFormName] = useState("");
+  const [categoryFormIcon, setCategoryFormIcon] = useState("burger");
+  const [modifierGroups, setModifierGroups] = useState([]);
+  const [modifierGroupName, setModifierGroupName] = useState("");
+  const [modifierOptionGroupId, setModifierOptionGroupId] = useState("");
+  const [modifierOptionName, setModifierOptionName] = useState("");
+  const [modifierOptionPrice, setModifierOptionPrice] = useState("");
+  const [staffMembers, setStaffMembers] = useState([]);
+  const [staffEmail, setStaffEmail] = useState("");
+  const [staffRole, setStaffRole] = useState("kitchen");
+  const [deliveryZones, setDeliveryZones] = useState([]);
+  const [zoneName, setZoneName] = useState("");
+  const [zoneFee, setZoneFee] = useState("");
+  const [zoneMinOrder, setZoneMinOrder] = useState("");
 
   // Cash Closing Modal
   const [showCashClose, setShowCashClose] = useState(false);
@@ -349,6 +372,27 @@ export default function App() {
         return;
       }
       if (dbProducts?.length) setProducts(dbProducts.map(mapProductFromDb));
+
+      const { data: dbCategories } = await supabase
+        .from("categories")
+        .select("id,name,icon,sort_order,is_active")
+        .eq("store_id", store.id)
+        .order("sort_order", { ascending: true });
+      if (dbCategories?.length) setMenuCategories(dbCategories);
+
+      const { data: dbModifierGroups } = await supabase
+        .from("modifier_groups")
+        .select("id,name,min_select,max_select,is_required,sort_order,modifier_options(id,name,price_cents,is_active,sort_order)")
+        .eq("store_id", store.id)
+        .order("sort_order", { ascending: true });
+      if (dbModifierGroups) setModifierGroups(dbModifierGroups);
+
+      const { data: dbZones } = await supabase
+        .from("delivery_zones")
+        .select("id,name,delivery_fee_cents,min_order_cents,is_active")
+        .eq("store_id", store.id)
+        .order("name", { ascending: true });
+      if (dbZones) setDeliveryZones(dbZones);
     }
 
     loadCatalog();
@@ -371,7 +415,17 @@ export default function App() {
       setOrders((data || []).map(mapOrderFromDb));
     }
 
+    async function loadStaff() {
+      const { data } = await supabase
+        .from("store_memberships")
+        .select("id,user_id,role,is_active,profiles(full_name,phone)")
+        .eq("store_id", activeStoreId)
+        .order("created_at", { ascending: true });
+      if (data) setStaffMembers(data);
+    }
+
     loadOrders();
+    loadStaff();
 
     const channel = supabase
       .channel("orders-live")
@@ -784,6 +838,7 @@ _Pedido enviado via Cardápio Digital!_`;
     setProductFormCategory("Burgers");
     setProductFormPrice("");
     setProductFormDesc("");
+    setProductFormImage("/assets/new-direction/doutor-burger.webp");
     setProductFormActive(true);
   }
 
@@ -793,6 +848,7 @@ _Pedido enviado via Cardápio Digital!_`;
     setProductFormCategory(product.category);
     setProductFormPrice(product.price.toString());
     setProductFormDesc(product.description);
+    setProductFormImage(product.image || "/assets/new-direction/doutor-burger.webp");
     setProductFormActive(product.active !== false);
   }
 
@@ -817,7 +873,7 @@ _Pedido enviado via Cardápio Digital!_`;
         category: productFormCategory,
         price: parsedPrice,
         description: productFormDesc,
-        image: "/assets/new-direction/doutor-burger.webp",
+        image: productFormImage || "/assets/new-direction/doutor-burger.webp",
         active: productFormActive,
       };
       if (supabase && activeStoreId) {
@@ -828,7 +884,7 @@ _Pedido enviado via Cardápio Digital!_`;
             category_id: categoryId,
             name: productFormName,
             description: productFormDesc,
-            image_path: "/assets/new-direction/doutor-burger.webp",
+            image_path: productFormImage || "/assets/new-direction/doutor-burger.webp",
             price_cents: Math.round(parsedPrice * 100),
             is_active: productFormActive,
           })
@@ -851,6 +907,7 @@ _Pedido enviado via Cardápio Digital!_`;
             category_id: categoryId,
             name: productFormName,
             description: productFormDesc,
+            image_path: productFormImage || "/assets/new-direction/doutor-burger.webp",
             price_cents: Math.round(parsedPrice * 100),
             is_active: productFormActive,
           })
@@ -866,6 +923,7 @@ _Pedido enviado via Cardápio Digital!_`;
         category: productFormCategory,
         price: parsedPrice,
         description: productFormDesc,
+        image: productFormImage || p.image,
         active: productFormActive,
       } : p));
     }
@@ -884,6 +942,152 @@ _Pedido enviado via Cardápio Digital!_`;
       }
       setProducts(prev => prev.filter(p => p.id !== productId));
     }
+  }
+
+  async function saveCategoryForm(e) {
+    e.preventDefault();
+    if (!supabase || !activeStoreId || !categoryFormName.trim()) return;
+    const { data, error } = await supabase
+      .from("categories")
+      .upsert({
+        store_id: activeStoreId,
+        name: categoryFormName.trim(),
+        icon: categoryFormIcon,
+        sort_order: (menuCategories.length + 1) * 10,
+        is_active: true,
+      }, { onConflict: "store_id,name" })
+      .select("id,name,icon,sort_order,is_active")
+      .single();
+    if (error) {
+      alert(error.message);
+      return;
+    }
+    setMenuCategories((prev) => [...prev.filter((cat) => cat.id !== data.id && cat.name !== data.name), data].sort((a, b) => a.sort_order - b.sort_order));
+    setCategoryFormName("");
+  }
+
+  async function toggleCategory(category) {
+    if (!supabase) return;
+    const { data, error } = await supabase
+      .from("categories")
+      .update({ is_active: !category.is_active })
+      .eq("id", category.id)
+      .select("id,name,icon,sort_order,is_active")
+      .single();
+    if (error) {
+      alert(error.message);
+      return;
+    }
+    setMenuCategories((prev) => prev.map((cat) => (cat.id === data.id ? data : cat)));
+  }
+
+  async function saveModifierGroup(e) {
+    e.preventDefault();
+    if (!supabase || !activeStoreId || !modifierGroupName.trim()) return;
+    const { data, error } = await supabase
+      .from("modifier_groups")
+      .insert({
+        store_id: activeStoreId,
+        name: modifierGroupName.trim(),
+        min_select: 0,
+        max_select: 6,
+        is_required: false,
+        sort_order: (modifierGroups.length + 1) * 10,
+      })
+      .select("id,name,min_select,max_select,is_required,sort_order,modifier_options(id,name,price_cents,is_active,sort_order)")
+      .single();
+    if (error) {
+      alert(error.message);
+      return;
+    }
+    setModifierGroups((prev) => [...prev, { ...data, modifier_options: [] }]);
+    setModifierGroupName("");
+  }
+
+  async function saveModifierOption(e) {
+    e.preventDefault();
+    if (!supabase || !modifierOptionGroupId || !modifierOptionName.trim()) return;
+    const { data, error } = await supabase
+      .from("modifier_options")
+      .insert({
+        group_id: modifierOptionGroupId,
+        name: modifierOptionName.trim(),
+        price_cents: Math.round(Number(modifierOptionPrice || 0) * 100),
+        is_active: true,
+      })
+      .select("id,name,price_cents,is_active,sort_order")
+      .single();
+    if (error) {
+      alert(error.message);
+      return;
+    }
+    setModifierGroups((prev) => prev.map((group) => (
+      group.id === modifierOptionGroupId
+        ? { ...group, modifier_options: [...(group.modifier_options || []), data] }
+        : group
+    )));
+    setModifierOptionName("");
+    setModifierOptionPrice("");
+  }
+
+  async function addStaffMember(e) {
+    e.preventDefault();
+    if (!supabase || !activeStoreId || !staffEmail.trim()) return;
+    const { error } = await supabase.rpc("add_store_member_by_email", {
+      p_store_id: activeStoreId,
+      p_email: staffEmail.trim(),
+      p_role: staffRole,
+    });
+    if (error) {
+      alert(error.message);
+      return;
+    }
+    setStaffEmail("");
+    const { data } = await supabase
+      .from("store_memberships")
+      .select("id,user_id,role,is_active,profiles(full_name,phone)")
+      .eq("store_id", activeStoreId)
+      .order("created_at", { ascending: true });
+    if (data) setStaffMembers(data);
+  }
+
+  async function toggleStaffMember(member) {
+    if (!supabase) return;
+    const { data, error } = await supabase
+      .from("store_memberships")
+      .update({ is_active: !member.is_active })
+      .eq("id", member.id)
+      .select("id,user_id,role,is_active,profiles(full_name,phone)")
+      .single();
+    if (error) {
+      alert(error.message);
+      return;
+    }
+    setStaffMembers((prev) => prev.map((item) => (item.id === data.id ? data : item)));
+  }
+
+  async function saveDeliveryZone(e) {
+    e.preventDefault();
+    if (!supabase || !activeStoreId || !zoneName.trim()) return;
+    const { data, error } = await supabase
+      .from("delivery_zones")
+      .upsert({
+        store_id: activeStoreId,
+        name: zoneName.trim(),
+        delivery_fee_cents: Math.round(Number(zoneFee || 0) * 100),
+        min_order_cents: Math.round(Number(zoneMinOrder || 0) * 100),
+        is_active: true,
+      }, { onConflict: "store_id,name" })
+      .select("id,name,delivery_fee_cents,min_order_cents,is_active")
+      .single();
+    if (error) {
+      alert(error.message);
+      return;
+    }
+    setDeliveryZones((prev) => [...prev.filter((zone) => zone.id !== data.id && zone.name !== data.name), data].sort((a, b) => a.name.localeCompare(b.name)));
+    setZoneName("");
+    setZoneFee("");
+    setZoneMinOrder("");
   }
 
   const cashClosingText = useMemo(() => {
@@ -1011,6 +1215,10 @@ _Pedido enviado via Cardápio Digital!_`;
           <nav>
             <button className={adminTab === "orders" ? "is-active" : ""} onClick={() => setAdminTab("orders")}>Pedidos</button>
             <button className={adminTab === "menu" ? "is-active" : ""} onClick={() => setAdminTab("menu")}>Cardápio</button>
+            <button className={adminTab === "categories" ? "is-active" : ""} onClick={() => setAdminTab("categories")}>Categorias</button>
+            <button className={adminTab === "modifiers" ? "is-active" : ""} onClick={() => setAdminTab("modifiers")}>Adicionais</button>
+            <button className={adminTab === "delivery" ? "is-active" : ""} onClick={() => setAdminTab("delivery")}>Entregas</button>
+            <button className={adminTab === "staff" ? "is-active" : ""} onClick={() => setAdminTab("staff")}>Equipe</button>
             <button className={adminTab === "settings" ? "is-active" : ""} onClick={() => setAdminTab("settings")}>Configurações</button>
             <button onClick={() => setPage("kitchen")}>Tela de Cozinha (KDS)</button>
             <button onClick={handleLogout} style={{ marginTop: "auto", background: "rgba(255, 100, 100, 0.1)", color: "#ff8888" }}>Sair do Painel</button>
@@ -1154,7 +1362,7 @@ _Pedido enviado via Cardápio Digital!_`;
                     </label>
                     <label className="field">Categoria
                       <select className="field" value={productFormCategory} onChange={(e) => setProductFormCategory(e.target.value)} style={{ width: "100%", height: "52px", borderRadius: "16px", padding: "0 16px", background: "#fff", border: "1px solid var(--line)" }}>
-                        {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                        {categoryNames.map(cat => <option key={cat} value={cat}>{cat}</option>)}
                       </select>
                     </label>
                     <label className="field">Preço (R$)
@@ -1169,6 +1377,9 @@ _Pedido enviado via Cardápio Digital!_`;
                   </div>
                   <label className="field" style={{ marginTop: "12px" }}>Descrição / Ingredientes
                     <textarea value={productFormDesc} onChange={(e) => setProductFormDesc(e.target.value)} style={{ width: "100%", minHeight: "80px", borderRadius: "16px", padding: "12px", border: "1px solid var(--line)" }} />
+                  </label>
+                  <label className="field" style={{ marginTop: "12px" }}>Imagem do produto
+                    <input value={productFormImage} onChange={(e) => setProductFormImage(e.target.value)} placeholder="/assets/products/foto.webp ou URL da imagem" />
                   </label>
                   <div style={{ display: "flex", gap: "10px", marginTop: "16px" }}>
                     <button className="primary-btn" type="submit">Salvar Produto</button>
@@ -1196,6 +1407,147 @@ _Pedido enviado via Cardápio Digital!_`;
                       <button className="outline-btn" style={{ minHeight: "34px", padding: "0 12px", borderRadius: "8px" }} onClick={() => openEditProduct(product)}>Editar</button>
                       <button className="outline-btn" style={{ minHeight: "34px", padding: "0 12px", borderRadius: "8px", borderColor: "#fcc", color: "#c44" }} onClick={() => deleteProduct(product.id)}>Excluir</button>
                     </span>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {adminTab === "categories" && (
+            <section className="admin-tab">
+              <div className="section-head" style={{ marginBottom: "20px" }}>
+                <div><span className="eyebrow">Organização</span><h2>Categorias do cardápio</h2></div>
+              </div>
+              <form onSubmit={saveCategoryForm} className="settings-card" style={{ background: "#fff", border: "1px solid var(--line)", borderRadius: "18px", padding: "20px", marginBottom: "20px" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 180px auto", gap: "12px", alignItems: "end" }}>
+                  <label className="field">Nome
+                    <input value={categoryFormName} onChange={(e) => setCategoryFormName(e.target.value)} placeholder="Ex: Bebidas" />
+                  </label>
+                  <label className="field">Ícone
+                    <select value={categoryFormIcon} onChange={(e) => setCategoryFormIcon(e.target.value)} style={{ width: "100%", height: "52px", borderRadius: "16px", padding: "0 16px", background: "#fff", border: "1px solid var(--line)" }}>
+                      {["burger", "combo", "fries", "drink", "cake"].map((icon) => <option key={icon} value={icon}>{icon}</option>)}
+                    </select>
+                  </label>
+                  <button className="primary-btn" type="submit">Salvar</button>
+                </div>
+              </form>
+              <div className="admin-table">
+                <div className="table-row head"><span>Categoria</span><span>Ícone</span><span>Status</span><span>Ações</span></div>
+                {menuCategories.map((category) => (
+                  <div className="table-row" key={category.id}>
+                    <span>{category.name}</span>
+                    <span>{category.icon}</span>
+                    <span>{category.is_active ? "Ativa" : "Pausada"}</span>
+                    <span><button className="outline-btn" onClick={() => toggleCategory(category)}>{category.is_active ? "Pausar" : "Ativar"}</button></span>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {adminTab === "modifiers" && (
+            <section className="admin-tab">
+              <div className="section-head" style={{ marginBottom: "20px" }}>
+                <div><span className="eyebrow">Personalização</span><h2>Adicionais e opções</h2></div>
+              </div>
+              <div className="settings-grid">
+                <form onSubmit={saveModifierGroup} className="settings-card">
+                  <h2>Novo grupo</h2>
+                  <label className="field">Nome do grupo
+                    <input value={modifierGroupName} onChange={(e) => setModifierGroupName(e.target.value)} placeholder="Ex: Extras" />
+                  </label>
+                  <button className="primary-btn full" type="submit">Criar grupo</button>
+                </form>
+                <form onSubmit={saveModifierOption} className="settings-card">
+                  <h2>Nova opção</h2>
+                  <label className="field">Grupo
+                    <select value={modifierOptionGroupId} onChange={(e) => setModifierOptionGroupId(e.target.value)} style={{ width: "100%", height: "52px", borderRadius: "16px", padding: "0 16px", background: "#fff", border: "1px solid var(--line)" }}>
+                      <option value="">Selecione</option>
+                      {modifierGroups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}
+                    </select>
+                  </label>
+                  <label className="field">Nome
+                    <input value={modifierOptionName} onChange={(e) => setModifierOptionName(e.target.value)} placeholder="Ex: Bacon extra" />
+                  </label>
+                  <label className="field">Preço adicional
+                    <input type="number" step="0.01" value={modifierOptionPrice} onChange={(e) => setModifierOptionPrice(e.target.value)} />
+                  </label>
+                  <button className="primary-btn full" type="submit">Criar opção</button>
+                </form>
+              </div>
+              <div className="admin-table" style={{ marginTop: "20px" }}>
+                <div className="table-row head"><span>Grupo</span><span>Opções</span><span>Seleção</span><span>Status</span></div>
+                {modifierGroups.map((group) => (
+                  <div className="table-row" key={group.id}>
+                    <span>{group.name}</span>
+                    <span>{(group.modifier_options || []).map((option) => `${option.name} (${money.format(centsToMoney(option.price_cents))})`).join(", ") || "Sem opções"}</span>
+                    <span>{group.min_select} a {group.max_select}</span>
+                    <span>{group.is_required ? "Obrigatório" : "Opcional"}</span>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {adminTab === "delivery" && (
+            <section className="admin-tab">
+              <div className="section-head" style={{ marginBottom: "20px" }}>
+                <div><span className="eyebrow">Entrega</span><h2>Áreas e taxas</h2></div>
+              </div>
+              <form onSubmit={saveDeliveryZone} className="settings-card" style={{ background: "#fff", border: "1px solid var(--line)", borderRadius: "18px", padding: "20px", marginBottom: "20px" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 160px 160px auto", gap: "12px", alignItems: "end" }}>
+                  <label className="field">Bairro / área
+                    <input value={zoneName} onChange={(e) => setZoneName(e.target.value)} placeholder="Ex: Alto do Mateus" />
+                  </label>
+                  <label className="field">Taxa
+                    <input type="number" step="0.01" value={zoneFee} onChange={(e) => setZoneFee(e.target.value)} />
+                  </label>
+                  <label className="field">Pedido mínimo
+                    <input type="number" step="0.01" value={zoneMinOrder} onChange={(e) => setZoneMinOrder(e.target.value)} />
+                  </label>
+                  <button className="primary-btn" type="submit">Salvar</button>
+                </div>
+              </form>
+              <div className="admin-table">
+                <div className="table-row head"><span>Área</span><span>Taxa</span><span>Mínimo</span><span>Status</span></div>
+                {deliveryZones.map((zone) => (
+                  <div className="table-row" key={zone.id}>
+                    <span>{zone.name}</span>
+                    <span>{money.format(centsToMoney(zone.delivery_fee_cents))}</span>
+                    <span>{money.format(centsToMoney(zone.min_order_cents))}</span>
+                    <span>{zone.is_active ? "Ativa" : "Pausada"}</span>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {adminTab === "staff" && (
+            <section className="admin-tab">
+              <div className="section-head" style={{ marginBottom: "20px" }}>
+                <div><span className="eyebrow">Acesso</span><h2>Equipe da loja</h2></div>
+              </div>
+              <form onSubmit={addStaffMember} className="settings-card" style={{ background: "#fff", border: "1px solid var(--line)", borderRadius: "18px", padding: "20px", marginBottom: "20px" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 180px auto", gap: "12px", alignItems: "end" }}>
+                  <label className="field">E-mail já cadastrado
+                    <input type="email" value={staffEmail} onChange={(e) => setStaffEmail(e.target.value)} placeholder="funcionario@email.com" />
+                  </label>
+                  <label className="field">Função
+                    <select value={staffRole} onChange={(e) => setStaffRole(e.target.value)} style={{ width: "100%", height: "52px", borderRadius: "16px", padding: "0 16px", background: "#fff", border: "1px solid var(--line)" }}>
+                      {["admin", "manager", "kitchen", "cashier"].map((role) => <option key={role} value={role}>{role}</option>)}
+                    </select>
+                  </label>
+                  <button className="primary-btn" type="submit">Adicionar</button>
+                </div>
+              </form>
+              <div className="admin-table">
+                <div className="table-row head"><span>Usuário</span><span>Função</span><span>Status</span><span>Ações</span></div>
+                {staffMembers.map((member) => (
+                  <div className="table-row" key={member.id}>
+                    <span>{member.profiles?.full_name || member.user_id}</span>
+                    <span>{member.role}</span>
+                    <span>{member.is_active ? "Ativo" : "Inativo"}</span>
+                    <span><button className="outline-btn" onClick={() => toggleStaffMember(member)}>{member.is_active ? "Desativar" : "Ativar"}</button></span>
                   </div>
                 ))}
               </div>
@@ -1422,9 +1774,10 @@ _Pedido enviado via Cardápio Digital!_`;
             </div>
           )}
 
-          <Catalog
-            activeCategory={activeCategory}
-            filteredProducts={filteredProducts}
+            <Catalog
+              activeCategory={activeCategory}
+              categories={categoryNames}
+              filteredProducts={filteredProducts}
             search={search}
             setActiveCategory={setActiveCategory}
             setSearch={setSearch}
@@ -1537,7 +1890,7 @@ function Header({ count, onHome, onCart, onDelivery, isStoreOpen }) {
   );
 }
 
-function Catalog({ activeCategory, filteredProducts, search, setActiveCategory, setSearch, openProduct, addQuick, isStoreOpen }) {
+function Catalog({ activeCategory, categories, filteredProducts, search, setActiveCategory, setSearch, openProduct, addQuick, isStoreOpen }) {
   return (
     <section className="catalog" id="inicio">
       <Hero />

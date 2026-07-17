@@ -188,6 +188,47 @@ export type Database = {
         }
         Relationships: []
       }
+      delivery_zones: {
+        Row: {
+          created_at: string
+          delivery_fee_cents: number
+          id: string
+          is_active: boolean
+          min_order_cents: number
+          name: string
+          store_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          delivery_fee_cents?: number
+          id?: string
+          is_active?: boolean
+          min_order_cents?: number
+          name: string
+          store_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          delivery_fee_cents?: number
+          id?: string
+          is_active?: boolean
+          min_order_cents?: number
+          name?: string
+          store_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_zones_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       integration_accounts: {
         Row: {
           config: Json
@@ -847,6 +888,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      add_store_member_by_email: {
+        Args: {
+          p_email: string
+          p_role: Database["public"]["Enums"]["membership_role"]
+          p_store_id: string
+        }
+        Returns: string
+      }
       can_access_order: { Args: { check_order_id: string }; Returns: boolean }
       has_store_role: {
         Args: {
