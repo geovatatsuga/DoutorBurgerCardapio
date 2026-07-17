@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { isSupabaseConfigured, supabase } from "./lib/supabase";
 
 const money = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 
@@ -147,6 +148,59 @@ const mockOrders = [
   },
 ];
 
+const statusToDb = {
+  Recebido: "received",
+  Confirmado: "confirmed",
+  "Em preparo": "preparing",
+  Pronto: "ready",
+  "Saiu para entrega": "dispatched",
+  Entregue: "completed",
+  Cancelado: "cancelled",
+};
+
+const statusFromDb = Object.fromEntries(Object.entries(statusToDb).map(([label, value]) => [value, label]));
+
+function centsToMoney(cents) {
+  return Number(cents || 0) / 100;
+}
+
+function mapProductFromDb(product) {
+  return {
+    id: product.id,
+    category: product.categories?.name || "Burgers",
+    name: product.name,
+    description: product.description || "",
+    price: centsToMoney(product.price_cents),
+    image: product.image_path || "/assets/new-direction/doutor-burger.webp",
+    active: product.is_active,
+    dbId: product.id,
+  };
+}
+
+function mapOrderFromDb(order) {
+  return {
+    id: `#${order.order_number}`,
+    dbId: order.id,
+    name: order.customer_name,
+    phone: order.customer_phone,
+    address: order.fulfillment === "delivery" ? (order.delivery_address?.street || order.delivery_address?.address || "") : "Retirada no Balcao",
+    complement: order.delivery_address?.complement || "",
+    payment: order.payment_method,
+    items: (order.order_items || []).map((item) => ({
+      name: item.product_name,
+      qty: item.quantity,
+      price: centsToMoney(item.unit_price_cents),
+      notes: item.notes,
+    })),
+    subtotal: centsToMoney(order.subtotal_cents),
+    deliveryFee: centsToMoney(order.delivery_fee_cents),
+    total: centsToMoney(order.total_cents),
+    status: statusFromDb[order.status] || "Recebido",
+    time: new Date(order.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+    origin: order.source === "website" ? "Cardapio" : order.source,
+  };
+}
+
 export default function App() {
   const [page, setPage] = useState(() => {
     const params = new URLSearchParams(window.location.search);
@@ -192,16 +246,16 @@ export default function App() {
   const [extras, setExtras] = useState([]);
   const [removedIngredients, setRemovedIngredients] = useState([]);
   const [meat, setMeat] = useState("Ao ponto");
-  const [combo, setCombo] = useState(true);
+  const [combo, setCombo] = useState(false);
   const [note, setNote] = useState("");
   const [receiveMode, setReceiveMode] = useState("Entrega");
   const [flow, setFlow] = useState(null);
   const [currentClientOrder, setCurrentClientOrder] = useState(null);
 
   // Client Checkout Fields
-  const [checkoutName, setCheckoutName] = useState("Lucas Fernandes");
-  const [checkoutPhone, setCheckoutPhone] = useState("(83) 98765-4321");
-  const [checkoutAddress, setCheckoutAddress] = useState("Rua Manoel Lopes de Carvalho, 123 - Auto do Mateus");
+  const [checkoutName, setCheckoutName] = useState("");
+  const [checkoutPhone, setCheckoutPhone] = useState("");
+  const [checkoutAddress, setCheckoutAddress] = useState("");
   const [checkoutComplement, setCheckoutComplement] = useState("");
   const [checkoutPayment, setCheckoutPayment] = useState("Pix");
   const [checkoutChange, setCheckoutChange] = useState("");
@@ -209,8 +263,8 @@ export default function App() {
 
   // Admin Dashboard State
   const [selectedAdminOrderId, setSelectedAdminOrderId] = useState(() => orders[0]?.id || "");
-  const [loginEmail, setLoginEmail] = useState("admin@doutorburger.com.br");
-  const [loginPassword, setLoginPassword] = useState("123456");
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
   const [loginError, setLoginError] = useState("");
 
   // Product Add/Edit Form State
@@ -225,6 +279,9 @@ export default function App() {
   const [showCashClose, setShowCashClose] = useState(false);
   const [receiptOrder, setReceiptOrder] = useState(null);
   const [receiptType, setReceiptType] = useState("fiscal"); // "fiscal" or "cozinha"
+  const [session, setSession] = useState(null);
+  const [supabaseNotice, setSupabaseNotice] = useState("");
+  const [activeStoreId, setActiveStoreId] = useState(null);
 
   // Persistence
   useEffect(() => {
@@ -238,6 +295,92 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem("doutor_settings", JSON.stringify(storeSettings));
   }, [storeSettings]);
+
+  useEffect(() => {
+    if (!supabase) return;
+
+    supabase.auth.getSession().then(({ data }) => setSession(data.session));
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      setSession(nextSession);
+    });
+
+    return () => listener.subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (!supabase) return;
+
+    async function loadCatalog() {
+      const { data: store, error: storeError } = await supabase
+        .from("stores")
+        .select("id,name,phone,address,min_order_cents,delivery_fee_cents,delivery_time_label,store_hours(day_of_week,opens_at,closes_at,is_open)")
+        .eq("slug", "doutor-burger")
+        .maybeSingle();
+
+      if (storeError) {
+        setSupabaseNotice(storeError.message);
+        return;
+      }
+      if (!store) return;
+
+      setActiveStoreId(store.id);
+      setStoreSettings((current) => ({
+        ...current,
+        name: store.name,
+        phone: store.phone || current.phone,
+        address: store.address || current.address,
+        minOrder: centsToMoney(store.min_order_cents),
+        deliveryFee: centsToMoney(store.delivery_fee_cents),
+        deliveryTime: store.delivery_time_label || current.deliveryTime,
+        openDays: (store.store_hours || []).filter((hour) => hour.is_open).map((hour) => hour.day_of_week),
+        openHour: store.store_hours?.[0]?.opens_at?.slice(0, 5) || current.openHour,
+        closeHour: store.store_hours?.[0]?.closes_at?.slice(0, 5) || current.closeHour,
+      }));
+
+      const { data: dbProducts, error: productError } = await supabase
+        .from("products")
+        .select("id,name,description,image_path,price_cents,is_active,sort_order,categories(name)")
+        .eq("store_id", store.id)
+        .order("sort_order", { ascending: true });
+
+      if (productError) {
+        setSupabaseNotice(productError.message);
+        return;
+      }
+      if (dbProducts?.length) setProducts(dbProducts.map(mapProductFromDb));
+    }
+
+    loadCatalog();
+  }, []);
+
+  useEffect(() => {
+    if (!supabase || !session || !activeStoreId) return;
+
+    async function loadOrders() {
+      const { data, error } = await supabase
+        .from("orders")
+        .select("*,order_items(product_name,quantity,unit_price_cents,notes)")
+        .eq("store_id", activeStoreId)
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        setSupabaseNotice(error.message);
+        return;
+      }
+      setOrders((data || []).map(mapOrderFromDb));
+    }
+
+    loadOrders();
+
+    const channel = supabase
+      .channel("orders-live")
+      .on("postgres_changes", { event: "*", schema: "public", table: "orders", filter: `store_id=eq.${activeStoreId}` }, loadOrders)
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [session, activeStoreId]);
 
   // Real-time synchronization via BroadcastChannel
   useEffect(() => {
@@ -369,7 +512,7 @@ export default function App() {
   }
 
   // Handle Client Checkout
-  function submitClientOrder() {
+  async function submitClientOrder() {
     if (!checkoutName.trim()) {
       setCheckoutError("Por favor, preencha o seu nome completo.");
       return;
@@ -389,7 +532,7 @@ export default function App() {
       ? `Dinheiro (Troco para R$ ${checkoutChange})`
       : checkoutPayment;
 
-    const newOrder = {
+    let newOrder = {
       id: orderId,
       name: checkoutName,
       phone: checkoutPhone,
@@ -404,6 +547,41 @@ export default function App() {
       time: new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
       origin: "Cardápio",
     };
+
+    if (supabase) {
+      if (!session) {
+        setCheckoutError("Entre ou cadastre-se para finalizar o pedido com segurança.");
+        setPage("login");
+        return;
+      }
+
+      if (!activeStoreId) {
+        setCheckoutError("Banco Supabase ainda nao carregado. Aplique as migrations e tente novamente.");
+        return;
+      }
+
+      try {
+        const { data: rpcOrderId, error } = await supabase.rpc("place_order", {
+          p_store_id: activeStoreId,
+          p_fulfillment: receiveMode === "Entrega" ? "delivery" : "pickup",
+          p_customer_name: checkoutName.trim(),
+          p_customer_phone: checkoutPhone.trim(),
+          p_delivery_address: receiveMode === "Entrega" ? { street: checkoutAddress.trim(), complement: checkoutComplement.trim() || null } : null,
+          p_payment_method: checkoutPayment === "Dinheiro" ? "cash" : checkoutPayment === "Pix" ? "pix" : "credit_card",
+          p_items: cart.map((item) => ({
+            product_id: item.dbId || item.id,
+            quantity: item.qty,
+            notes: item.notes || null,
+          })),
+          p_notes: checkoutPayment === "Dinheiro" && checkoutChange.trim() ? `Troco para R$ ${checkoutChange}` : null,
+        });
+        if (error) throw error;
+        newOrder = { ...newOrder, id: `#${String(rpcOrderId).slice(0, 8)}`, dbId: rpcOrderId };
+      } catch (error) {
+        setCheckoutError(error.message || "Não foi possível criar o pedido.");
+        return;
+      }
+    }
 
     const updatedOrders = [newOrder, ...orders];
     setOrders(updatedOrders);
@@ -453,17 +631,36 @@ _Pedido enviado via Cardápio Digital!_`;
   }
 
   // Admin Actions
-  function handleAdminLogin(e) {
+  async function handleAdminLogin(e) {
     e.preventDefault();
-    if (loginEmail === "admin@doutorburger.com.br" && loginPassword === "123456") {
-      setPage("admin");
-      setLoginError("");
-    } else {
-      setLoginError("E-mail ou senha incorretos.");
+    if (!supabase) {
+      setLoginError("Supabase nao configurado. Defina as variaveis VITE_SUPABASE_URL e VITE_SUPABASE_PUBLISHABLE_KEY.");
+      return;
     }
+    const { error } = await supabase.auth.signInWithPassword({ email: loginEmail, password: loginPassword });
+    if (error) {
+      setLoginError(error.message);
+      return;
+    }
+    setPage("admin");
+    setLoginError("");
   }
 
-  function updateOrderStatus(id, newStatus) {
+  async function updateOrderStatus(id, newStatus) {
+    const target = orders.find((order) => order.id === id || order.dbId === id);
+    if (!confirm(`Confirmar mudanca do pedido ${target?.id || id} para "${newStatus}"?`)) return;
+    if (supabase && target?.dbId) {
+      const { error } = await supabase.rpc("transition_order_status", {
+        p_order_id: target.dbId,
+        p_new_status: statusToDb[newStatus],
+        p_reason: "Alterado no painel administrativo",
+      });
+      if (error) {
+        alert(error.message);
+        return;
+      }
+    }
+
     const updated = orders.map(order => order.id === id ? { ...order, status: newStatus } : order);
     setOrders(updated);
     if (currentClientOrder && currentClientOrder.id === id) {
@@ -480,6 +677,36 @@ _Pedido enviado via Cardápio Digital!_`;
 
   function cancelOrder(id) {
     updateOrderStatus(id, "Cancelado");
+  }
+
+  async function handleSignUp() {
+    if (!supabase) {
+      setLoginError("Configure VITE_SUPABASE_URL e VITE_SUPABASE_PUBLISHABLE_KEY para cadastro.");
+      return;
+    }
+    const { error } = await supabase.auth.signUp({
+      email: loginEmail,
+      password: loginPassword,
+      options: { data: { full_name: checkoutName, phone: checkoutPhone } },
+    });
+    setLoginError(error ? error.message : "Cadastro criado. Verifique seu e-mail se a confirmação estiver habilitada.");
+  }
+
+  async function handlePasswordRecovery() {
+    if (!supabase) {
+      setLoginError("Configure o Supabase para recuperar senha.");
+      return;
+    }
+    const { error } = await supabase.auth.resetPasswordForEmail(loginEmail, {
+      redirectTo: window.location.origin,
+    });
+    setLoginError(error ? error.message : "Enviamos as instruções de recuperação para o e-mail informado.");
+  }
+
+  async function handleLogout() {
+    if (supabase) await supabase.auth.signOut();
+    setSession(null);
+    setPage("client");
   }
 
   function simulateIFoodOrder() {
@@ -534,9 +761,20 @@ _Pedido enviado via Cardápio Digital!_`;
     setProductFormActive(product.active !== false);
   }
 
-  function saveProductForm(e) {
+  async function saveProductForm(e) {
     e.preventDefault();
     const parsedPrice = parseFloat(productFormPrice) || 0;
+    let categoryId = null;
+    if (supabase && activeStoreId) {
+      const { data: category } = await supabase
+        .from("categories")
+        .select("id")
+        .eq("store_id", activeStoreId)
+        .eq("name", productFormCategory)
+        .maybeSingle();
+      categoryId = category?.id || null;
+    }
+
     if (editingProduct.id === "new") {
       const newProduct = {
         id: "p_" + Date.now(),
@@ -547,8 +785,46 @@ _Pedido enviado via Cardápio Digital!_`;
         image: "/assets/new-direction/doutor-burger.webp",
         active: productFormActive,
       };
+      if (supabase && activeStoreId) {
+        const { data, error } = await supabase
+          .from("products")
+          .insert({
+            store_id: activeStoreId,
+            category_id: categoryId,
+            name: productFormName,
+            description: productFormDesc,
+            image_path: "/assets/new-direction/doutor-burger.webp",
+            price_cents: Math.round(parsedPrice * 100),
+            is_active: productFormActive,
+          })
+          .select("id,name,description,image_path,price_cents,is_active,sort_order,categories(name)")
+          .single();
+        if (error) {
+          alert(error.message);
+          return;
+        }
+        setProducts(prev => [...prev, mapProductFromDb(data)]);
+        setEditingProduct(null);
+        return;
+      }
       setProducts(prev => [...prev, newProduct]);
     } else {
+      if (supabase && editingProduct.dbId) {
+        const { error } = await supabase
+          .from("products")
+          .update({
+            category_id: categoryId,
+            name: productFormName,
+            description: productFormDesc,
+            price_cents: Math.round(parsedPrice * 100),
+            is_active: productFormActive,
+          })
+          .eq("id", editingProduct.dbId);
+        if (error) {
+          alert(error.message);
+          return;
+        }
+      }
       setProducts(prev => prev.map(p => p.id === editingProduct.id ? {
         ...p,
         name: productFormName,
@@ -561,8 +837,16 @@ _Pedido enviado via Cardápio Digital!_`;
     setEditingProduct(null);
   }
 
-  function deleteProduct(productId) {
+  async function deleteProduct(productId) {
     if (confirm("Tem certeza que deseja remover este produto?")) {
+      const product = products.find((item) => item.id === productId);
+      if (supabase && product?.dbId) {
+        const { error } = await supabase.from("products").update({ is_active: false }).eq("id", product.dbId);
+        if (error) {
+          alert(error.message);
+          return;
+        }
+      }
       setProducts(prev => prev.filter(p => p.id !== productId));
     }
   }
@@ -612,7 +896,11 @@ _Pedido enviado via Cardápio Digital!_`;
             <label className="field">E-mail <input type="email" value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} /></label>
             <label className="field">Senha <input type="password" value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)} /></label>
             <button className="primary-btn full" type="submit">Entrar no painel</button>
+            <button className="outline-btn full" type="button" onClick={handleSignUp}>Criar cadastro</button>
+            <button className="outline-btn full" type="button" onClick={handlePasswordRecovery}>Recuperar senha</button>
           </form>
+          {!isSupabaseConfigured && <p className="notice">Supabase ainda nao configurado. Usando dados locais de demonstracao.</p>}
+          {supabaseNotice && <p style={{ color: "#ff8888", fontWeight: "bold" }}>{supabaseNotice}</p>}
           <button className="muted-link" onClick={() => setPage("client")} style={{ background: "none", border: 0, cursor: "pointer" }}>Voltar ao cardapio</button>
         </section>
       </main>
@@ -691,7 +979,7 @@ _Pedido enviado via Cardápio Digital!_`;
             <button className={adminTab === "menu" ? "is-active" : ""} onClick={() => setAdminTab("menu")}>Cardápio</button>
             <button className={adminTab === "settings" ? "is-active" : ""} onClick={() => setAdminTab("settings")}>Configurações</button>
             <button onClick={() => setPage("kitchen")}>Tela de Cozinha (KDS)</button>
-            <button onClick={() => setPage("client")} style={{ marginTop: "auto", background: "rgba(255, 100, 100, 0.1)", color: "#ff8888" }}>Sair do Painel</button>
+            <button onClick={handleLogout} style={{ marginTop: "auto", background: "rgba(255, 100, 100, 0.1)", color: "#ff8888" }}>Sair do Painel</button>
           </nav>
         </aside>
 
@@ -1661,8 +1949,6 @@ function FlowDrawer({
   checkoutError,
   setCheckoutError,
 }) {
-  if (!flow) return null;
-
   const [checkoutStep, setCheckoutStep] = React.useState(1);
 
   React.useEffect(() => {
@@ -1672,6 +1958,8 @@ function FlowDrawer({
       setCheckoutStep(2);
     }
   }, [flow]);
+
+  if (!flow) return null;
 
   const showProgress = flow === "delivery" || flow === "checkout";
 
