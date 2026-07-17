@@ -306,6 +306,7 @@ export default function App() {
   const [session, setSession] = useState(null);
   const [supabaseNotice, setSupabaseNotice] = useState("");
   const [activeStoreId, setActiveStoreId] = useState(null);
+  const [currentStaffRole, setCurrentStaffRole] = useState(null);
 
   // Persistence
   useEffect(() => {
@@ -686,11 +687,35 @@ _Pedido enviado via Cardápio Digital!_`;
       setLoginError("Supabase nao configurado. Defina as variaveis VITE_SUPABASE_URL e VITE_SUPABASE_PUBLISHABLE_KEY.");
       return;
     }
-    const { error } = await supabase.auth.signInWithPassword({ email: loginEmail, password: loginPassword });
+    const { data, error } = await supabase.auth.signInWithPassword({ email: loginEmail, password: loginPassword });
     if (error) {
       setLoginError(error.message);
       return;
     }
+
+    if (!activeStoreId) {
+      setLoginError("Banco Supabase ainda nao carregado. Aguarde um instante e tente novamente.");
+      await supabase.auth.signOut();
+      return;
+    }
+
+    const { data: membership, error: membershipError } = await supabase
+      .from("store_memberships")
+      .select("role")
+      .eq("store_id", activeStoreId)
+      .eq("user_id", data.user.id)
+      .eq("is_active", true)
+      .maybeSingle();
+
+    if (membershipError || !membership) {
+      setLoginError("Acesso restrito. Este usuario nao e um colaborador ativo desta loja.");
+      await supabase.auth.signOut();
+      return;
+    }
+
+    setCurrentStaffRole(membership.role);
+    if (membership.role === "kitchen") setAdminTab("orders");
+    if (membership.role === "cashier") setAdminTab("orders");
     setPage("admin");
     setLoginError("");
   }
@@ -795,6 +820,7 @@ _Pedido enviado via Cardápio Digital!_`;
   async function handleLogout() {
     if (supabase) await supabase.auth.signOut();
     setSession(null);
+    setCurrentStaffRole(null);
     setPage("client");
   }
 
@@ -1207,6 +1233,10 @@ _Pedido enviado via Cardápio Digital!_`;
     const metricNew = orders.filter(o => o.status === "Recebido").length;
     const metricPrep = orders.filter(o => o.status === "Em preparo").length;
     const metricRevenue = orders.filter(o => o.status === "Entregue").reduce((sum, o) => sum + o.total, 0);
+    const canManageCatalog = ["owner", "admin", "manager"].includes(currentStaffRole);
+    const canManageStaff = ["owner", "admin"].includes(currentStaffRole);
+    const canManageSettings = ["owner", "admin", "manager"].includes(currentStaffRole);
+    const canUseKitchen = ["owner", "admin", "manager", "kitchen"].includes(currentStaffRole);
 
     return (
       <main className="admin-shell">
@@ -1217,13 +1247,13 @@ _Pedido enviado via Cardápio Digital!_`;
           </a>
           <nav>
             <button className={adminTab === "orders" ? "is-active" : ""} onClick={() => setAdminTab("orders")}>Pedidos</button>
-            <button className={adminTab === "menu" ? "is-active" : ""} onClick={() => setAdminTab("menu")}>Cardápio</button>
-            <button className={adminTab === "categories" ? "is-active" : ""} onClick={() => setAdminTab("categories")}>Categorias</button>
-            <button className={adminTab === "modifiers" ? "is-active" : ""} onClick={() => setAdminTab("modifiers")}>Adicionais</button>
-            <button className={adminTab === "delivery" ? "is-active" : ""} onClick={() => setAdminTab("delivery")}>Entregas</button>
-            <button className={adminTab === "staff" ? "is-active" : ""} onClick={() => setAdminTab("staff")}>Equipe</button>
-            <button className={adminTab === "settings" ? "is-active" : ""} onClick={() => setAdminTab("settings")}>Configurações</button>
-            <button onClick={() => setPage("kitchen")}>Tela de Cozinha (KDS)</button>
+            {canManageCatalog && <button className={adminTab === "menu" ? "is-active" : ""} onClick={() => setAdminTab("menu")}>Cardapio</button>}
+            {canManageCatalog && <button className={adminTab === "categories" ? "is-active" : ""} onClick={() => setAdminTab("categories")}>Categorias</button>}
+            {canManageCatalog && <button className={adminTab === "modifiers" ? "is-active" : ""} onClick={() => setAdminTab("modifiers")}>Adicionais</button>}
+            {canManageSettings && <button className={adminTab === "delivery" ? "is-active" : ""} onClick={() => setAdminTab("delivery")}>Entregas</button>}
+            {canManageStaff && <button className={adminTab === "staff" ? "is-active" : ""} onClick={() => setAdminTab("staff")}>Equipe</button>}
+            {canManageSettings && <button className={adminTab === "settings" ? "is-active" : ""} onClick={() => setAdminTab("settings")}>Configuracoes</button>}
+            {canUseKitchen && <button onClick={() => setPage("kitchen")}>Tela de Cozinha (KDS)</button>}
             <button onClick={handleLogout} style={{ marginTop: "auto", background: "rgba(255, 100, 100, 0.1)", color: "#ff8888" }}>Sair do Painel</button>
           </nav>
         </aside>
