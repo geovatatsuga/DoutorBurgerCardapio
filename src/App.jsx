@@ -1174,7 +1174,7 @@ _Pedido enviado via Cardápio Digital!_`;
     return (
       <main className="admin-login">
         <section className="login-card">
-          <span className="brand-mark"><img src="/assets/brand/logo.png" alt="Doutor Burger Logo" /></span>
+          <span className="brand-mark"><img src="/assets/brand/logo.png" alt="Doutor Burger Logo" width="64" height="64" decoding="async" /></span>
           <h1>Entrar como loja</h1>
           <p>Acesse pedidos, cardapio, horarios e mensagens do painel digital.</p>
           {loginError && <p style={{ color: "#ff8888", fontWeight: "bold" }}>{loginError}</p>}
@@ -1260,7 +1260,7 @@ _Pedido enviado via Cardápio Digital!_`;
       <main className="admin-shell">
         <aside className="admin-sidebar">
           <a className="brand" href="#" onClick={(e) => { e.preventDefault(); setPage("client"); }}>
-            <span className="brand-mark"><img src="/assets/brand/logo.png" alt="Doutor Burger Logo" /></span>
+            <span className="brand-mark"><img src="/assets/brand/logo.png" alt="Doutor Burger Logo" width="64" height="64" decoding="async" /></span>
             <span><strong>{storeSettings.name}</strong><small>Painel da loja</small></span>
           </a>
           <nav>
@@ -1914,7 +1914,7 @@ function Header({ count, onHome, onCart, onDelivery, isStoreOpen }) {
   return (
     <header className="topbar">
       <a className="brand" href="#inicio" aria-label="Doutor Burger inicio" onClick={(event) => { event.preventDefault(); onHome(); }}>
-        <span className="brand-mark"><img src="/assets/brand/logo.png" alt="Doutor Burger Logo" /></span>
+        <span className="brand-mark"><img src="/assets/brand/logo.png" alt="Doutor Burger Logo" width="64" height="64" decoding="async" /></span>
         <span><strong>Doutor Burger</strong><small>Cura sua fome</small></span>
       </a>
       <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
@@ -1995,7 +1995,7 @@ function Hero() {
           <span><Icon name="coin" /><strong>Taxa</strong> a partir de R$ 6,90</span>
         </div>
       </div>
-      <img src="/assets/new-direction/doutor-burger.webp" alt="Doutor Burger em destaque" />
+      <img src="/assets/new-direction/doutor-burger.webp" alt="Doutor Burger em destaque" width="960" height="960" decoding="async" fetchPriority="high" />
     </div>
   );
 }
@@ -2014,7 +2014,7 @@ function Favorites({ products, openProduct }) {
         {favorites.map((product, index) => {
           return (
             <article className="favorite-card" key={product.id} onClick={() => openProduct(product.id)} style={{ cursor: "pointer" }}>
-              <img src={product.image} alt={product.name} />
+              <img src={product.image} alt={product.name} width="960" height="960" loading="lazy" decoding="async" />
               <span style={{ zIndex: 1 }}>{labels[index]}</span>
               <h3>{product.name}</h3>
               <strong>{money.format(product.price)}</strong>
@@ -2036,7 +2036,7 @@ function ProductRow({ product, openProduct, addQuick, isStoreOpen }) {
 
   return (
     <article className="product-card" onClick={() => openProduct(product.id)} style={{ cursor: "pointer" }}>
-      <img src={product.image} alt={product.name} />
+      <img src={product.image} alt={product.name} width="960" height="960" loading="lazy" decoding="async" />
       <div>
         <h3>{product.name}</h3>
         <ul className="product-ingredients" aria-label="Principais ingredientes">
@@ -2079,7 +2079,7 @@ function Combos({ products, openProduct, isStoreOpen }) {
         {products.slice(0, 3).map((product, index) => {
           return (
             <article className="combo-card" key={product.id} onClick={() => openProduct(product.id)} style={{ cursor: "pointer" }}>
-              <img src={product.image} alt={product.name} />
+              <img src={product.image} alt={product.name} width="960" height="960" loading="lazy" decoding="async" />
               <span>{labels[index]}</span>
               <h3>{product.name}</h3>
               <ul className="combo-includes">
@@ -2106,7 +2106,7 @@ function CartPanel({ cart, subtotal, total, receiveMode, setReceiveMode, updateQ
         <div className="cart-items">
           {cart.length ? cart.map((item) => (
             <article className="cart-item" key={item.key}>
-              <img src={item.image} alt={item.name} />
+              <img src={item.image} alt={item.name} width="960" height="960" loading="lazy" decoding="async" />
               <div>
                 <strong>{item.name}</strong>
                 <p>{item.notes || "Sem observacoes"}</p>
@@ -2226,7 +2226,7 @@ function ProductDetail({
                   <button className="gallery-nav-btn next" onClick={nextImage} aria-label="Próximo">&gt;</button>
                 </>
               )}
-              <img className="detail-image" src={galleryImages[activeImgIndex] || product.image} alt={product.name} />
+              <img className="detail-image" src={galleryImages[activeImgIndex] || product.image} alt={product.name} width="960" height="960" decoding="async" fetchPriority="high" />
               <div className="detail-thumbs">
                 {galleryImages.map((img, idx) => (
                   <img
