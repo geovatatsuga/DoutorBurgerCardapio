@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { isSupabaseConfigured, supabase } from "./lib/supabase";
 
 const money = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
+const STORE_SLUG = "burgerc";
 
 // BroadcastChannel for real-time synchronization between browser tabs
 const orderChannel = typeof window !== "undefined" ? new BroadcastChannel("doutor_burger_orders") : null;
@@ -314,7 +315,7 @@ export default function App() {
       const { data: store, error: storeError } = await supabase
         .from("stores")
         .select("id,name,phone,address,min_order_cents,delivery_fee_cents,delivery_time_label,store_hours(day_of_week,opens_at,closes_at,is_open)")
-        .eq("slug", "doutor-burger")
+        .eq("slug", STORE_SLUG)
         .maybeSingle();
 
       if (storeError) {
@@ -549,12 +550,6 @@ export default function App() {
     };
 
     if (supabase) {
-      if (!session) {
-        setCheckoutError("Entre ou cadastre-se para finalizar o pedido com segurança.");
-        setPage("login");
-        return;
-      }
-
       if (!activeStoreId) {
         setCheckoutError("Banco Supabase ainda nao carregado. Aplique as migrations e tente novamente.");
         return;
@@ -896,7 +891,6 @@ _Pedido enviado via Cardápio Digital!_`;
             <label className="field">E-mail <input type="email" value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} /></label>
             <label className="field">Senha <input type="password" value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)} /></label>
             <button className="primary-btn full" type="submit">Entrar no painel</button>
-            <button className="outline-btn full" type="button" onClick={handleSignUp}>Criar cadastro</button>
             <button className="outline-btn full" type="button" onClick={handlePasswordRecovery}>Recuperar senha</button>
           </form>
           {!isSupabaseConfigured && <p className="notice">Supabase ainda nao configurado. Usando dados locais de demonstracao.</p>}
@@ -1376,7 +1370,7 @@ _Pedido enviado via Cardápio Digital!_`;
   return (
     <>
       <div className="app-shell">
-        <Header count={count} onHome={() => setView("home")} onCart={() => setView("cart")} onDelivery={() => setFlow("delivery")} onAdminClick={() => setPage("login")} isStoreOpen={isStoreOpen} />
+        <Header count={count} onHome={() => setView("home")} onCart={() => setView("cart")} onDelivery={() => setFlow("delivery")} isStoreOpen={isStoreOpen} />
         <main className="customer-grid">
           {/* Closed notice block - compact */}
           {!isStoreOpen && (
@@ -1469,7 +1463,7 @@ _Pedido enviado via Cardápio Digital!_`;
   );
 }
 
-function Header({ count, onHome, onCart, onDelivery, onAdminClick, isStoreOpen }) {
+function Header({ count, onHome, onCart, onDelivery, isStoreOpen }) {
   return (
     <header className="topbar">
       <a className="brand" href="#inicio" aria-label="Doutor Burger inicio" onClick={(event) => { event.preventDefault(); onHome(); }}>
@@ -1496,9 +1490,6 @@ function Header({ count, onHome, onCart, onDelivery, onAdminClick, isStoreOpen }
       </div>
       <div className="top-actions">
         <button className="cart-top-btn" onClick={onCart}><Icon name="cart" /> Carrinho <span id="cartBadgeTop">{count}</span></button>
-        <button className="admin-link" onClick={onAdminClick} style={{ cursor: "pointer", background: "none", alignItems: "center" }}>
-          <Icon name="store" /> Entrar como loja
-        </button>
       </div>
     </header>
   );
