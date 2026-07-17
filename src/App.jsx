@@ -2035,12 +2035,13 @@ function Favorites({ products, openProduct }) {
 }
 
 function ProductRow({ product, openProduct, addQuick, isStoreOpen }) {
+  const hasPresetTags = Boolean(productCardTags[product.name]);
   const descriptionItems = productCardTags[product.name] || product.description
     .split(",")
     .map((item) => item.trim().replace(/\.$/, ""))
     .filter(Boolean);
-  const visibleIngredients = descriptionItems.slice(0, 3);
-  const remainingIngredients = descriptionItems.length - visibleIngredients.length;
+  const visibleIngredients = hasPresetTags ? descriptionItems : descriptionItems.slice(0, 3);
+  const remainingIngredients = hasPresetTags ? 0 : descriptionItems.length - visibleIngredients.length;
 
   return (
     <article className="product-card" onClick={() => openProduct(product.id)} style={{ cursor: "pointer" }}>
