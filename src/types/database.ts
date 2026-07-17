@@ -918,6 +918,24 @@ export type Database = {
         }
         Returns: string
       }
+      set_store_member_active: {
+        Args: { p_is_active: boolean; p_membership_id: string }
+        Returns: {
+          created_at: string
+          id: string
+          is_active: boolean
+          role: Database["public"]["Enums"]["membership_role"]
+          store_id: string
+          updated_at: string
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "store_memberships"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       transition_order_status: {
         Args: {
           p_new_status: Database["public"]["Enums"]["order_status"]

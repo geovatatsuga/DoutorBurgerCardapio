@@ -1053,17 +1053,20 @@ _Pedido enviado via Cardápio Digital!_`;
 
   async function toggleStaffMember(member) {
     if (!supabase) return;
-    const { data, error } = await supabase
-      .from("store_memberships")
-      .update({ is_active: !member.is_active })
-      .eq("id", member.id)
-      .select("id,user_id,role,is_active,profiles(full_name,phone)")
-      .single();
+    const { error } = await supabase.rpc("set_store_member_active", {
+      p_membership_id: member.id,
+      p_is_active: !member.is_active,
+    });
     if (error) {
       alert(error.message);
       return;
     }
-    setStaffMembers((prev) => prev.map((item) => (item.id === data.id ? data : item)));
+    const { data } = await supabase
+      .from("store_memberships")
+      .select("id,user_id,role,is_active,profiles(full_name,phone)")
+      .eq("store_id", activeStoreId)
+      .order("created_at", { ascending: true });
+    if (data) setStaffMembers(data);
   }
 
   async function saveDeliveryZone(e) {
