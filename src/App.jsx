@@ -100,36 +100,54 @@ const categoryIcons = {
 
 const initialProducts = [
   {
-    id: "doutor",
+    id: "x-salada",
     category: "Burgers",
-    name: "Doutor Burger",
-    description: "Pao brioche, blend 180g, cheddar, bacon, alface, tomate e molho especial.",
-    price: 34.9,
-    image: "/assets/new-direction/doutor-burger.webp",
+    name: "X-Salada",
+    description: "Classico completo, fresco e equilibrado. Pao brioche dourado, maionese de ervas, cebola roxa, alface, tomate, queijo prato e blend bovino artesanal de 90 g.",
+    price: 18,
+    image: "/assets/products/x-salada-burgerc.png",
+    active: true,
+    isFavorite: true,
+  },
+  {
+    id: "cheeseburger",
+    category: "Burgers",
+    name: "Cheeseburger",
+    description: "Simples, robusto e com foco total em carne, queijo e molho. Pao brioche, maionese da casa, cheddar derretido e blend bovino artesanal de 90 g.",
+    price: 16,
+    image: "/assets/products/cheeseburger-burgerc.png",
     active: true,
   },
   {
-    id: "smash",
+    id: "x-bacon",
     category: "Burgers",
-    name: "Smash Cheddar",
-    description: "Dois smash burgers, cheddar cremoso, picles e cebola.",
-    price: 28.9,
-    image: "/assets/new-direction/smash-cheddar.webp",
+    name: "X-Bacon",
+    description: "Cheddar, cebola na chapa e bacon crocante. Pao brioche, maionese de alho, bacon em tiras, cebola dourada, cheddar e blend bovino artesanal de 90 g.",
+    price: 22,
+    image: "/assets/products/x-bacon-burgerc.png",
+    active: true,
+    isFavorite: true,
+  },
+  {
+    id: "agridoce",
+    category: "Burgers",
+    name: "Agridoce",
+    description: "Contraste tropical entre queijo coalho tostado e abacaxi caramelizado. Pao brioche, maionese de pimenta e blend bovino artesanal de 90 g.",
+    price: 25,
+    image: "/assets/products/agridoce-burgerc.png",
     active: true,
   },
   {
-    id: "combo-doutor",
-    category: "Combos",
-    name: "Combo Doutor",
-    description: "Doutor Burger, batata crocante e refrigerante gelado.",
-    price: 49.9,
-    image: "/assets/new-direction/chicken-crispy.webp",
+    id: "duplo",
+    category: "Burgers",
+    name: "Duplo",
+    description: "Montagem alta e robusta com 180 g de carne. Pao brioche, maionese defumada com cebolinha, cebola no vinho, bacon em cubos, duplo cheddar e dois blends de 90 g.",
+    price: 30,
+    image: "/assets/products/duplo-burgerc.png",
     active: true,
+    isFavorite: true,
   },
 ];
-
-const favoriteIds = ["doutor", "combo-doutor", "smash"];
-const comboIds = ["combo-doutor"];
 
 const mockOrders = [
   {
@@ -1811,6 +1829,7 @@ _Pedido enviado via Cardápio Digital!_`;
               activeCategory={activeCategory}
               categories={categoryNames}
               filteredProducts={filteredProducts}
+              products={products}
             search={search}
             setActiveCategory={setActiveCategory}
             setSearch={setSearch}
@@ -1923,12 +1942,13 @@ function Header({ count, onHome, onCart, onDelivery, isStoreOpen }) {
   );
 }
 
-function Catalog({ activeCategory, categories, filteredProducts, search, setActiveCategory, setSearch, openProduct, addQuick, isStoreOpen }) {
+function Catalog({ activeCategory, categories, filteredProducts, products, search, setActiveCategory, setSearch, openProduct, addQuick, isStoreOpen }) {
+  const comboProducts = products.filter((product) => product.active && product.category === "Combos");
   return (
     <section className="catalog" id="inicio">
       <Hero />
-      <Combos openProduct={openProduct} addQuick={addQuick} isStoreOpen={isStoreOpen} />
-      <Favorites openProduct={openProduct} isStoreOpen={isStoreOpen} />
+      <Combos products={comboProducts} openProduct={openProduct} isStoreOpen={isStoreOpen} />
+      <Favorites products={products} openProduct={openProduct} />
       <section className="section-block" id="cardapio">
         <div className="section-head">
           <div><span className="eyebrow">Cardapio completo</span><h2>Escolha o seu pedido</h2></div>
@@ -1980,13 +2000,10 @@ function Hero() {
   );
 }
 
-function Favorites({ openProduct, isStoreOpen }) {
-  const labels = ["Mais pedido", "Combo especial", "Cheddar duplo"];
-  const favImages = [
-    "/assets/new-direction/doutor-burger.webp",
-    "/assets/new-direction/combo-doutor.webp",
-    "/assets/new-direction/smash-cheddar.webp"
-  ];
+function Favorites({ products, openProduct }) {
+  const favorites = products.filter((product) => product.active && product.isFavorite).slice(0, 3);
+  if (!favorites.length) return null;
+  const labels = ["Mais pedido", "Favorito da casa", "Especial"];
   return (
     <section className="section-block favorites" id="mais-pedidos">
       <div className="section-head compact">
@@ -1994,13 +2011,13 @@ function Favorites({ openProduct, isStoreOpen }) {
         <a className="see-all" href="#cardapio">Ver todos</a>
       </div>
       <div className="favorite-grid">
-        {favoriteIds.map((id, index) => {
+        {favorites.map((product, index) => {
           return (
-            <article className="favorite-card" key={id} onClick={() => openProduct(id)} style={{ cursor: "pointer" }}>
-              <img src={favImages[index]} alt={id} />
+            <article className="favorite-card" key={product.id} onClick={() => openProduct(product.id)} style={{ cursor: "pointer" }}>
+              <img src={product.image} alt={product.name} />
               <span style={{ zIndex: 1 }}>{labels[index]}</span>
-              <h3>{id === "doutor" ? "Doutor Burger" : id === "smash" ? "Smash Cheddar" : "Combo Doutor"}</h3>
-              <strong>{id === "doutor" ? "R$ 34,90" : id === "smash" ? "R$ 28,90" : "R$ 49,90"}</strong>
+              <h3>{product.name}</h3>
+              <strong>{money.format(product.price)}</strong>
             </article>
           );
         })}
@@ -2046,9 +2063,9 @@ function WhyCard() {
   );
 }
 
-function Combos({ openProduct, addQuick, isStoreOpen }) {
-  const labels = ["Mais pedido"];
-  const comboImages = ["/assets/products/combo-doutor.webp"];
+function Combos({ products, openProduct, isStoreOpen }) {
+  if (!products.length) return null;
+  const labels = ["Mais pedido", "Combo especial", "Pronto para pedir"];
   return (
     <section className="section-block combo-section" id="combos">
       <div className="section-head compact">
@@ -2059,19 +2076,17 @@ function Combos({ openProduct, addQuick, isStoreOpen }) {
         </div>
       </div>
       <div className="combo-grid">
-        {comboIds.map((id, index) => {
+        {products.slice(0, 3).map((product, index) => {
           return (
-            <article className="combo-card" key={id} onClick={() => openProduct(id)} style={{ cursor: "pointer" }}>
-              <img src={comboImages[index]} alt={id} />
+            <article className="combo-card" key={product.id} onClick={() => openProduct(product.id)} style={{ cursor: "pointer" }}>
+              <img src={product.image} alt={product.name} />
               <span>{labels[index]}</span>
-              <h3>Combo Doutor</h3>
+              <h3>{product.name}</h3>
               <ul className="combo-includes">
-                <li>Duplo smash</li>
-                <li>Batata crocante</li>
-                <li>Refrigerante 350ml</li>
+                {product.description.split(",").slice(0, 3).map((item) => <li key={item}>{item.trim()}</li>)}
               </ul>
-              <strong>{id === "combo-doutor" ? "R$ 49,90" : "R$ 44,90"}</strong>
-              <button className="combo-cta" onClick={(event) => { event.stopPropagation(); openProduct(id); }}>Ver combo</button>
+              <strong>{money.format(product.price)}</strong>
+              {isStoreOpen && <button className="combo-cta" onClick={(event) => { event.stopPropagation(); openProduct(product.id); }}>Ver combo</button>}
             </article>
           );
         })}
