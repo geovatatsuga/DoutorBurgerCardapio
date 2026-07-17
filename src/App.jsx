@@ -103,7 +103,7 @@ const initialProducts = [
     id: "x-salada",
     category: "Burgers",
     name: "X-Salada",
-    description: "Classico completo, fresco e equilibrado. Pao brioche dourado, maionese de ervas, cebola roxa, alface, tomate, queijo prato e blend bovino artesanal de 90 g.",
+    description: "Um classico completo com carne suculenta de 90 g, queijo prato derretido e salada fresca no pao brioche dourado. A maionese de ervas fecha o sabor com leveza e deixa cada mordida equilibrada.",
     price: 18,
     image: "/assets/products/x-salada-burgerc.webp",
     active: true,
@@ -113,7 +113,7 @@ const initialProducts = [
     id: "cheeseburger",
     category: "Burgers",
     name: "Cheeseburger",
-    description: "Simples, robusto e com foco total em carne, queijo e molho. Pao brioche, maionese da casa, cheddar derretido e blend bovino artesanal de 90 g.",
+    description: "Direto ao ponto: blend bovino suculento de 90 g, cheddar bem derretido e maionese da casa no pao brioche. Simples, cremoso e feito para matar a vontade de burger de verdade.",
     price: 16,
     image: "/assets/products/cheeseburger-burgerc.webp",
     active: true,
@@ -122,7 +122,7 @@ const initialProducts = [
     id: "x-bacon",
     category: "Burgers",
     name: "X-Bacon",
-    description: "Cheddar, cebola na chapa e bacon crocante. Pao brioche, maionese de alho, bacon em tiras, cebola dourada, cheddar e blend bovino artesanal de 90 g.",
+    description: "Blend bovino de 90 g com cheddar derretido, bacon em tiras crocante e cebola chapeada. A maionese de alho traz aquele sabor marcante que combina com cada camada.",
     price: 22,
     image: "/assets/products/x-bacon-burgerc.webp",
     active: true,
@@ -132,7 +132,7 @@ const initialProducts = [
     id: "agridoce",
     category: "Burgers",
     name: "Agridoce",
-    description: "Contraste tropical entre queijo coalho tostado e abacaxi caramelizado. Pao brioche, maionese de pimenta e blend bovino artesanal de 90 g.",
+    description: "Uma combinacao diferente e viciante: carne suculenta de 90 g, queijo coalho tostado e abacaxi caramelizado. A maionese de pimenta equilibra o doce, o salgado e uma picancia na medida.",
     price: 25,
     image: "/assets/products/agridoce-burgerc.webp",
     active: true,
@@ -141,13 +141,21 @@ const initialProducts = [
     id: "duplo",
     category: "Burgers",
     name: "Duplo",
-    description: "Montagem alta e robusta com 180 g de carne. Pao brioche, maionese defumada com cebolinha, cebola no vinho, bacon em cubos, duplo cheddar e dois blends de 90 g.",
+    description: "O mais pesado da casa: dois blends bovinos suculentos, duplo cheddar, bacon em cubos e cebola caramelizada no vinho. A maionese defumada com cebolinha deixa o Duplo intenso do inicio ao fim.",
     price: 30,
     image: "/assets/products/duplo-burgerc.webp",
     active: true,
     isFavorite: true,
   },
 ];
+
+const productCardTags = {
+  "X-Salada": ["Pao brioche", "Blend 90 g", "Queijo prato", "Salada fresca"],
+  Cheeseburger: ["Pao brioche", "Blend 90 g", "Cheddar", "Maionese da casa"],
+  "X-Bacon": ["Pao brioche", "Blend 90 g", "Cheddar", "Bacon crocante"],
+  Agridoce: ["Pao brioche", "Blend 90 g", "Queijo coalho", "Abacaxi caramelizado"],
+  Duplo: ["Pao brioche", "2 blends 90 g", "Duplo cheddar", "Bacon em cubos"],
+};
 
 const mockOrders = [
   {
@@ -2027,7 +2035,7 @@ function Favorites({ products, openProduct }) {
 }
 
 function ProductRow({ product, openProduct, addQuick, isStoreOpen }) {
-  const descriptionItems = product.description
+  const descriptionItems = productCardTags[product.name] || product.description
     .split(",")
     .map((item) => item.trim().replace(/\.$/, ""))
     .filter(Boolean);
