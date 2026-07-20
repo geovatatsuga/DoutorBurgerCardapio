@@ -157,24 +157,6 @@ const productCardTags = {
   Duplo: ["Pao brioche", "2 blends 90 g", "Duplo cheddar", "Bacon em cubos"],
 };
 
-const mockOrders = [
-  {
-    id: "#5427",
-    name: "Lucas Fernandes",
-    phone: "(83) 98765-4321",
-    address: "Rua Manoel Lopes de Carvalho, 123 - Auto do Mateus, Joao Pessoa - PB",
-    complement: "Apto 302",
-    payment: "Pix",
-    items: [{ name: "Doutor Burger Combo", qty: 1, price: 46.8, notes: "Bem passado + Bacon extra" }],
-    subtotal: 46.8,
-    deliveryFee: 6.9,
-    total: 53.7,
-    status: "Em preparo",
-    time: "09:48",
-    origin: "Cardápio",
-  },
-];
-
 const statusToDb = {
   Recebido: "received",
   Confirmado: "confirmed",
@@ -270,10 +252,7 @@ export default function App() {
   })));
   const categoryNames = menuCategories.filter((category) => category.is_active !== false).map((category) => category.name);
 
-  const [orders, setOrders] = useState(() => {
-    const local = localStorage.getItem("doutor_orders");
-    return local ? JSON.parse(local) : mockOrders;
-  });
+  const [orders, setOrders] = useState([]);
 
   const [storeSettings, setStoreSettings] = useState(() => {
     const local = localStorage.getItem("doutor_settings");
@@ -362,8 +341,8 @@ export default function App() {
   }, [products]);
 
   useEffect(() => {
-    localStorage.setItem("doutor_orders", JSON.stringify(orders));
-  }, [orders]);
+    if (isSupabaseConfigured) localStorage.removeItem("doutor_orders");
+  }, []);
 
   useEffect(() => {
     localStorage.setItem("doutor_settings", JSON.stringify(storeSettings));
@@ -896,39 +875,6 @@ _Pedido enviado via Cardápio Digital!_`;
     setPage("client");
   }
 
-  function simulateIFoodOrder() {
-    const ifoodBurgers = ["Doutor Burger Combo", "Smash Cheddar Duplo"];
-    const names = ["Gabriel Silva", "Jéssica Carvalho"];
-    const chosenBurger = ifoodBurgers[Math.floor(Math.random() * ifoodBurgers.length)];
-    const items = [{ name: chosenBurger, qty: 1, price: 34.90, notes: "Sem cebola" }];
-
-    const newIFoodOrder = {
-      id: "#IFD" + Math.floor(1000 + Math.random() * 9000),
-      name: names[Math.floor(Math.random() * names.length)],
-      phone: "(83) 9" + Math.floor(10000000 + Math.random() * 90000000),
-      address: "Av. Cabo Branco, 2400 - Cabo Branco",
-      complement: "Apto 101",
-      payment: "Pago pelo App (iFood)",
-      items,
-      subtotal: 34.90,
-      deliveryFee: 6.90,
-      total: 41.80,
-      status: "Recebido",
-      time: new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
-      origin: "iFood",
-    };
-
-    setOrders(prev => [newIFoodOrder, ...prev]);
-    setSelectedAdminOrderId(newIFoodOrder.id);
-    playNotificationSound("ifood");
-    if (orderChannel) {
-      orderChannel.postMessage({
-        type: "NEW_ORDER",
-        order: newIFoodOrder,
-      });
-    }
-  }
-
   // Edit or Add Product Form Submission
   function openAddProduct() {
     setEditingProduct({ id: "new" });
@@ -1334,17 +1280,6 @@ _Pedido enviado via Cardápio Digital!_`;
         </aside>
 
         <section className="admin-content">
-          <div className="ifood-simulator">
-            <div className="ifood-simulator-title">
-              <span className="ifood-logo-badge">iFood</span>
-              <div>
-                <h3>Simulador de Integração iFood</h3>
-                <p>Receba pedidos de teste para visualizar o funcionamento igual ao Saipos.</p>
-              </div>
-            </div>
-            <button onClick={simulateIFoodOrder}>+ Simular Novo Pedido</button>
-          </div>
-
           <header className="admin-header">
             <div>
               <span className="eyebrow">Gestão de Vendas</span>

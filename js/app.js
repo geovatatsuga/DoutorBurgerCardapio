@@ -112,17 +112,7 @@ const deliveryFee = 6.9;
 let activeCategory = "Burgers";
 let selectedProduct = products[0];
 let detailQty = 1;
-let cart = [
-  {
-    key: crypto.randomUUID(),
-    id: "doutor",
-    name: "Doutor Burger Combo",
-    image: products[0].image,
-    price: 46.8,
-    qty: 1,
-    notes: "Bem passado + Bacon extra",
-  },
-];
+let cart = [];
 
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => Array.from(document.querySelectorAll(selector));
