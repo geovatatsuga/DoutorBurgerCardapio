@@ -187,6 +187,26 @@ const statusToDb = {
 
 const statusFromDb = Object.fromEntries(Object.entries(statusToDb).map(([label, value]) => [value, label]));
 
+const orderStatusFlow = {
+  Recebido: ["Em preparo", "Cancelado"],
+  Confirmado: ["Em preparo", "Cancelado"],
+  "Em preparo": ["Pronto", "Cancelado"],
+  Pronto: ["Saiu para entrega", "Entregue", "Cancelado"],
+  "Saiu para entrega": ["Entregue", "Cancelado"],
+  Entregue: [],
+  Cancelado: [],
+};
+
+const orderStatusLabels = ["Recebido", "Confirmado", "Em preparo", "Pronto", "Saiu para entrega", "Entregue", "Cancelado"];
+
+function canMoveOrderStatus(currentStatus, nextStatus) {
+  return currentStatus === nextStatus || (orderStatusFlow[currentStatus] || []).includes(nextStatus);
+}
+
+function nextOrderStatuses(currentStatus) {
+  return orderStatusLabels.filter((status) => canMoveOrderStatus(currentStatus, status));
+}
+
 function centsToMoney(cents) {
   return Number(cents || 0) / 100;
 }
@@ -333,6 +353,8 @@ export default function App() {
   const [supabaseNotice, setSupabaseNotice] = useState("");
   const [activeStoreId, setActiveStoreId] = useState(null);
   const [currentStaffRole, setCurrentStaffRole] = useState(null);
+  const [pendingOrderStatuses, setPendingOrderStatuses] = useState({});
+  const [savingOrderId, setSavingOrderId] = useState("");
 
   // Persistence
   useEffect(() => {
@@ -746,23 +768,47 @@ _Pedido enviado via Cardápio Digital!_`;
     setLoginError("");
   }
 
-  async function updateOrderStatus(id, newStatus) {
+  async function updateOrderStatus(id, newStatus, options = {}) {
     const target = orders.find((order) => order.id === id || order.dbId === id);
-    if (!confirm(`Confirmar mudanca do pedido ${target?.id || id} para "${newStatus}"?`)) return;
+    if (!target) {
+      alert("Pedido nao encontrado na lista atual.");
+      return;
+    }
+    if (!canMoveOrderStatus(target.status, newStatus)) {
+      alert(`Nao da para mudar de "${target.status}" para "${newStatus}". Siga a sequencia do pedido.`);
+      return;
+    }
+    if (target.status === newStatus) {
+      setPendingOrderStatuses((prev) => {
+        const next = { ...prev };
+        delete next[target.id];
+        return next;
+      });
+      return;
+    }
+    if (!options.skipConfirm && !confirm(`Salvar mudanca do pedido ${target.id} para "${newStatus}"?`)) return;
+    setSavingOrderId(target.id);
     if (supabase && target?.dbId) {
       const { error } = await supabase.rpc("transition_order_status", {
         p_order_id: target.dbId,
         p_new_status: statusToDb[newStatus],
-        p_reason: "Alterado no painel administrativo",
+        p_reason: options.reason || "Alterado no painel administrativo",
       });
       if (error) {
+        setSavingOrderId("");
         alert(error.message);
         return;
       }
     }
 
-    const updated = orders.map(order => order.id === id ? { ...order, status: newStatus } : order);
+    const updated = orders.map(order => (order.id === target.id || order.dbId === target.dbId ? { ...order, status: newStatus } : order));
     setOrders(updated);
+    setPendingOrderStatuses((prev) => {
+      const next = { ...prev };
+      delete next[target.id];
+      return next;
+    });
+    setSavingOrderId("");
     if (currentClientOrder && currentClientOrder.id === id) {
       setCurrentClientOrder(prev => ({ ...prev, status: newStatus }));
     }
@@ -1176,6 +1222,9 @@ _Pedido enviado via Cardápio Digital!_`;
   }, [orders]);
 
   const selectedAdminOrder = orders.find(o => o.id === selectedAdminOrderId) || orders[0];
+  const selectedPendingStatus = selectedAdminOrder ? (pendingOrderStatuses[selectedAdminOrder.id] || selectedAdminOrder.status) : "";
+  const selectedStatusOptions = selectedAdminOrder ? nextOrderStatuses(selectedAdminOrder.status) : [];
+  const hasPendingStatusChange = Boolean(selectedAdminOrder && selectedPendingStatus && selectedPendingStatus !== selectedAdminOrder.status);
 
   // RENDER SELECTION BY PAGE
   if (page === "login") {
@@ -1201,7 +1250,7 @@ _Pedido enviado via Cardápio Digital!_`;
   }
 
   if (page === "kitchen") {
-    const activeKitchenOrders = orders.filter(o => o.status === "Recebido" || o.status === "Em preparo");
+    const activeKitchenOrders = orders.filter(o => ["Recebido", "Confirmado", "Em preparo"].includes(o.status));
     return (
       <main className="kitchen-view">
         <header className="kitchen-header">
@@ -1233,13 +1282,13 @@ _Pedido enviado via Cardápio Digital!_`;
                 </div>
               </div>
               <div className="kitchen-card-footer">
-                {order.status === "Recebido" ? (
-                  <button className="primary-btn full" style={{ minHeight: "42px" }} onClick={() => updateOrderStatus(order.id, "Em preparo")}>
-                    Preparar
+                {order.status === "Recebido" || order.status === "Confirmado" ? (
+                  <button className="primary-btn full" style={{ minHeight: "42px" }} disabled={savingOrderId === order.id} onClick={() => updateOrderStatus(order.id, "Em preparo", { skipConfirm: true, reason: "Iniciado na tela da cozinha" })}>
+                    {savingOrderId === order.id ? "Salvando..." : "Preparar"}
                   </button>
                 ) : (
-                  <button className="kds-btn-done full" onClick={() => updateOrderStatus(order.id, "Pronto")}>
-                    Marcar como Pronto
+                  <button className="kds-btn-done full" disabled={savingOrderId === order.id} onClick={() => updateOrderStatus(order.id, "Pronto", { skipConfirm: true, reason: "Finalizado na tela da cozinha" })}>
+                    {savingOrderId === order.id ? "Salvando..." : "Marcar como Pronto"}
                   </button>
                 )}
               </div>
@@ -1374,18 +1423,37 @@ _Pedido enviado via Cardápio Digital!_`;
 
                     <h3>Atualizar Status</h3>
                     <div className="status-actions">
-                      {["Recebido", "Em preparo", "Pronto", "Saiu para entrega", "Entregue"].map(st => (
+                      {orderStatusLabels.map(st => {
+                        const isAllowed = selectedStatusOptions.includes(st);
+                        return (
                         <button
                           key={st}
-                          className={selectedAdminOrder.status === st ? "is-active" : ""}
-                          onClick={() => updateOrderStatus(selectedAdminOrder.id, st)}
+                          type="button"
+                          disabled={!isAllowed || savingOrderId === selectedAdminOrder.id}
+                          className={selectedPendingStatus === st ? "is-active" : ""}
+                          onClick={() => setPendingOrderStatuses((prev) => ({ ...prev, [selectedAdminOrder.id]: st }))}
+                          title={!isAllowed ? `Nao permitido a partir de ${selectedAdminOrder.status}` : ""}
                         >
                           {st}
                         </button>
-                      ))}
+                        );
+                      })}
                     </div>
+                    {hasPendingStatusChange && (
+                      <p style={{ margin: "8px 0 0", color: "var(--muted)", fontWeight: 700 }}>
+                        Alteracao pendente: {selectedAdminOrder.status} para {selectedPendingStatus}
+                      </p>
+                    )}
 
                     <div className="admin-buttons">
+                      <button
+                        className="primary-btn"
+                        type="button"
+                        disabled={!hasPendingStatusChange || savingOrderId === selectedAdminOrder.id}
+                        onClick={() => updateOrderStatus(selectedAdminOrder.id, selectedPendingStatus, { skipConfirm: true, reason: "Salvo no painel de pedidos" })}
+                      >
+                        {savingOrderId === selectedAdminOrder.id ? "Salvando..." : "Salvar atualizacao"}
+                      </button>
                       <button className="outline-btn" onClick={() => setReceiptOrder(selectedAdminOrder)}>Imprimir Recibo</button>
                       <a
                         className="outline-btn"
