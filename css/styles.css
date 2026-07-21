@@ -6739,3 +6739,15 @@ body.detail-mode .detail-copy > .purchase-bar {
 
   .mobile-cart-bar strong { color: #ffb11a; font-size: 14px; }
 }
+
+/* Product photos must sit on pure white, especially beverage cans with white backgrounds. */
+.product-card img,
+.favorite-card img,
+.combo-card img,
+.cart-item img {
+  background: #ffffff !important;
+}
+
+.product-card img {
+  object-fit: contain !important;
+}
