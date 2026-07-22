@@ -1588,6 +1588,23 @@ _Pedido enviado via Cardápio Digital!_`;
                   <button className="primary-btn" type="submit">Salvar</button>
                 </div>
               </form>
+              <div className="settings-card delivery-summary-card" style={{ background: "#fff", border: "1px solid var(--line)", borderRadius: "18px", padding: "18px 20px", marginBottom: "20px" }}>
+                <span className="eyebrow">Resumo publico</span>
+                <h2 style={{ margin: "4px 0 8px" }}>Bairros atendidos</h2>
+                <p style={{ margin: 0, color: "var(--muted)", fontWeight: 700 }}>
+                  {deliveryZones.length ? deliveryZones.map((zone) => zone.name).join(", ") : "Nenhuma area cadastrada ainda."}
+                </p>
+                {deliveryZones.length > 0 && (() => {
+                  const fees = deliveryZones.map((zone) => centsToMoney(zone.delivery_fee_cents));
+                  const minFee = Math.min(...fees);
+                  const maxFee = Math.max(...fees);
+                  return (
+                    <strong style={{ display: "block", marginTop: "10px", color: "var(--accent-strong)" }}>
+                      Taxas: {minFee === maxFee ? money.format(minFee) : `${money.format(minFee)} a ${money.format(maxFee)}`}
+                    </strong>
+                  );
+                })()}
+              </div>
               <div className="admin-table">
                 <div className="table-row head"><span>Categoria</span><span>Ícone</span><span>Status</span><span>Ações</span></div>
                 {menuCategories.map((category) => (
@@ -1928,9 +1945,6 @@ _Pedido enviado via Cardápio Digital!_`;
           isStoreOpen={isStoreOpen}
           storeSettings={storeSettings}
           deliveryZones={activeDeliveryZones}
-          selectedDeliveryZoneId={selectedDeliveryZoneId}
-          setSelectedDeliveryZoneId={setSelectedDeliveryZoneId}
-          selectedDeliveryZone={selectedDeliveryZone}
         />
         <main className="customer-grid">
           {/* Closed notice block - compact */}
@@ -1947,6 +1961,7 @@ _Pedido enviado via Cardápio Digital!_`;
               filteredProducts={filteredProducts}
               products={products}
               storeSettings={storeSettings}
+              deliveryZones={activeDeliveryZones}
               currentFee={currentFee}
               currentMinOrder={currentMinOrder}
               search={search}
@@ -2037,8 +2052,9 @@ _Pedido enviado via Cardápio Digital!_`;
   );
 }
 
-function Header({ count, onHome, onCart, isStoreOpen, storeSettings, deliveryZones, selectedDeliveryZoneId, setSelectedDeliveryZoneId, selectedDeliveryZone }) {
-  const locationLabel = selectedDeliveryZone?.name || storeSettings.address?.split("-")[0]?.trim() || "Area de entrega";
+function Header({ count, onHome, onCart, isStoreOpen, storeSettings, deliveryZones }) {
+  const zoneNames = deliveryZones.map((zone) => zone.name).filter(Boolean);
+  const locationLabel = zoneNames.length ? zoneNames.join(", ") : storeSettings.address?.split("-")[0]?.trim() || "Areas de entrega";
   return (
     <header className="topbar">
       <a className="brand" href="#inicio" aria-label={`${storeSettings.name} inicio`} onClick={(event) => { event.preventDefault(); onHome(); }}>
@@ -2046,24 +2062,10 @@ function Header({ count, onHome, onCart, isStoreOpen, storeSettings, deliveryZon
         <span><strong>{storeSettings.name}</strong><small>Cura sua fome</small></span>
       </a>
       <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-        <label className="location-pill location-select">
+        <div className="location-pill location-coverage" title={locationLabel}>
           <Icon name="pin" />
-          {deliveryZones.length > 0 ? (
-            <select
-              aria-label="Area de entrega"
-              value={selectedDeliveryZoneId}
-              onChange={(event) => setSelectedDeliveryZoneId(event.target.value)}
-            >
-              {deliveryZones.map((zone) => (
-                <option key={zone.id} value={zone.id}>
-                  {zone.name} - {money.format(centsToMoney(zone.delivery_fee_cents))}
-                </option>
-              ))}
-            </select>
-          ) : (
-            <span>{locationLabel}</span>
-          )}
-        </label>
+          <span>{locationLabel}</span>
+        </div>
         <span style={{
           background: isStoreOpen ? "#ecf8e8" : "#fee3e3",
           color: isStoreOpen ? "#27852c" : "#c94b3a",
@@ -2084,11 +2086,11 @@ function Header({ count, onHome, onCart, isStoreOpen, storeSettings, deliveryZon
   );
 }
 
-function Catalog({ activeCategory, categories, filteredProducts, products, storeSettings, isStoreOpen, currentFee, currentMinOrder, search, setActiveCategory, setSearch, openProduct, addQuick }) {
+function Catalog({ activeCategory, categories, filteredProducts, products, storeSettings, deliveryZones, isStoreOpen, currentFee, currentMinOrder, search, setActiveCategory, setSearch, openProduct, addQuick }) {
   const comboProducts = products.filter((product) => product.active && product.category === "Combos");
   return (
     <section className="catalog" id="inicio">
-      <Hero storeSettings={storeSettings} isStoreOpen={isStoreOpen} currentFee={currentFee} currentMinOrder={currentMinOrder} />
+      <Hero storeSettings={storeSettings} deliveryZones={deliveryZones} isStoreOpen={isStoreOpen} currentFee={currentFee} currentMinOrder={currentMinOrder} />
       <Combos products={comboProducts} openProduct={openProduct} isStoreOpen={isStoreOpen} />
       <Favorites products={products} openProduct={openProduct} />
       <section className="section-block" id="cardapio">
@@ -2119,15 +2121,19 @@ function Catalog({ activeCategory, categories, filteredProducts, products, store
   );
 }
 
-function Hero({ storeSettings, isStoreOpen, currentFee, currentMinOrder }) {
+function Hero({ storeSettings, deliveryZones, isStoreOpen, currentFee, currentMinOrder }) {
   const storeName = storeSettings.name || "BurgerC";
   const titleParts = storeName.split(/\s+/);
   const firstTitle = titleParts[0] || storeName;
   const secondTitle = titleParts.slice(1).join(" ") || "";
   const closeLabel = storeSettings.closeHour ? `Ate ${storeSettings.closeHour}` : "Horario configurado";
   const statusText = isStoreOpen ? "Aberto agora" : "Fechado agora";
-  const feeLabel = currentFee > 0 ? `a partir de ${money.format(currentFee)}` : "gratis";
-  const minOrderLabel = currentMinOrder > 0 ? `Min. ${money.format(currentMinOrder)}` : "Sem minimo";
+  const zoneFees = deliveryZones.map((zone) => centsToMoney(zone.delivery_fee_cents));
+  const minFee = zoneFees.length ? Math.min(...zoneFees) : currentFee;
+  const maxFee = zoneFees.length ? Math.max(...zoneFees) : currentFee;
+  const feeLabel = maxFee <= 0 ? "gratis" : minFee === maxFee ? money.format(minFee) : `${money.format(minFee)} a ${money.format(maxFee)}`;
+  const zoneMinimums = deliveryZones.map((zone) => centsToMoney(zone.min_order_cents)).filter((value) => value > 0);
+  const minOrderLabel = zoneMinimums.length ? `Min. ${money.format(Math.min(...zoneMinimums))}` : currentMinOrder > 0 ? `Min. ${money.format(currentMinOrder)}` : "Sem minimo";
 
   return (
     <div className="hero">
@@ -2143,7 +2149,7 @@ function Hero({ storeSettings, isStoreOpen, currentFee, currentMinOrder }) {
           <span><Icon name="clock" /><strong>{statusText}</strong> {closeLabel}</span>
           <span><Icon name="bike" /><strong>Entrega</strong> {storeSettings.deliveryTime}</span>
           <span><Icon name="bag" /><strong>Retirada</strong> 20-30 min</span>
-          <span><Icon name="coin" /><strong>Taxa</strong> {feeLabel} - {minOrderLabel}</span>
+          <span><Icon name="coin" /><strong>Taxas</strong> {feeLabel} - {minOrderLabel}</span>
         </div>
       </div>
       <img src="/assets/new-direction/doutor-burger.webp" alt="Doutor Burger em destaque" width="960" height="960" decoding="async" fetchPriority="high" />

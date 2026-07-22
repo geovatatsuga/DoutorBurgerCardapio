@@ -3868,33 +3868,17 @@ body.detail-mode .summary-product img {
   color: #ee8500;
 }
 
-.location-select {
-  cursor: pointer;
-  min-width: 220px;
-  position: relative;
+.location-coverage {
+  cursor: default;
+  max-width: min(48vw, 620px);
 }
 
-.location-select select {
-  appearance: none;
-  background: transparent;
-  border: 0;
-  color: #1f2026;
-  cursor: pointer;
-  font: inherit;
-  font-weight: 900;
-  max-width: 260px;
-  outline: 0;
-  padding: 0 18px 0 0;
-}
-
-.location-select::after {
-  color: #ee8500;
-  content: "v";
-  font-size: 15px;
-  font-weight: 900;
-  pointer-events: none;
-  position: absolute;
-  right: 12px;
+.location-coverage span {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .hero {
