@@ -62,7 +62,7 @@ function checkStoreOpen(settings) {
   // Permitir pedidos sempre em ambiente de teste/desenvolvimento local para facilitar validações do cliente
   if (typeof window !== "undefined") {
     const host = window.location.hostname;
-    if (host === "localhost" || host === "127.0.0.1" || host === "" || host.includes("vercel") || host.includes("gitpod") || host.includes("codesandbox")) {
+    if (host === "localhost" || host === "127.0.0.1" || host === "") {
       return true;
     }
   }
@@ -320,6 +320,7 @@ export default function App() {
   const [staffEmail, setStaffEmail] = useState("");
   const [staffRole, setStaffRole] = useState("kitchen");
   const [deliveryZones, setDeliveryZones] = useState([]);
+  const [selectedDeliveryZoneId, setSelectedDeliveryZoneId] = useState("");
   const [zoneName, setZoneName] = useState("");
   const [zoneFee, setZoneFee] = useState("");
   const [zoneMinOrder, setZoneMinOrder] = useState("");
@@ -431,7 +432,10 @@ export default function App() {
         .select("id,name,delivery_fee_cents,min_order_cents,is_active")
         .eq("store_id", store.id)
         .order("name", { ascending: true });
-      if (dbZones) setDeliveryZones(dbZones);
+      if (dbZones) {
+        setDeliveryZones(dbZones);
+        setSelectedDeliveryZoneId((currentZoneId) => currentZoneId || dbZones.find((zone) => zone.is_active !== false)?.id || "");
+      }
     }
 
     loadCatalog();
@@ -565,7 +569,11 @@ export default function App() {
   // Client totals logic
   const selectedProduct = products.find((product) => product.id === selectedId) ?? products[0];
   const subtotal = cart.reduce((sum, item) => sum + item.price * item.qty, 0);
-  const currentFee = receiveMode === "Entrega" ? storeSettings.deliveryFee : 0;
+  const activeDeliveryZones = deliveryZones.filter((zone) => zone.is_active !== false);
+  const selectedDeliveryZone = activeDeliveryZones.find((zone) => zone.id === selectedDeliveryZoneId) || activeDeliveryZones[0] || null;
+  const currentDeliveryFee = selectedDeliveryZone ? centsToMoney(selectedDeliveryZone.delivery_fee_cents) : storeSettings.deliveryFee;
+  const currentMinOrder = selectedDeliveryZone ? centsToMoney(selectedDeliveryZone.min_order_cents) : storeSettings.minOrder;
+  const currentFee = receiveMode === "Entrega" ? currentDeliveryFee : 0;
   const total = subtotal ? subtotal + currentFee : 0;
   const count = cart.reduce((sum, item) => sum + item.qty, 0);
   const detailUnitPrice = selectedProduct ? (selectedProduct.price + extras.reduce((sum, item) => sum + item.price, 0) + (combo ? 11.9 : 0)) : 0;
@@ -648,6 +656,15 @@ export default function App() {
       return;
     }
 
+    if (receiveMode === "Entrega" && activeDeliveryZones.length > 0 && !selectedDeliveryZone) {
+      setCheckoutError("Por favor, selecione a area de entrega.");
+      return;
+    }
+    if (receiveMode === "Entrega" && subtotal < currentMinOrder) {
+      setCheckoutError(`Pedido minimo para esta area: ${money.format(currentMinOrder)}.`);
+      return;
+    }
+
     setCheckoutError("");
     const orderId = "#" + Math.floor(1000 + Math.random() * 9000);
     const paymentMethod = checkoutPayment === "Dinheiro" && checkoutChange.trim()
@@ -658,7 +675,7 @@ export default function App() {
       id: orderId,
       name: checkoutName,
       phone: checkoutPhone,
-      address: receiveMode === "Entrega" ? checkoutAddress : "Retirada no Balcão",
+      address: receiveMode === "Entrega" ? `${checkoutAddress}${selectedDeliveryZone ? ` - ${selectedDeliveryZone.name}` : ""}` : "Retirada no Balcao",
       complement: checkoutComplement,
       payment: paymentMethod,
       items: cart.map(item => ({ name: item.name, qty: item.qty, price: item.price, notes: item.notes })),
@@ -682,7 +699,7 @@ export default function App() {
           p_fulfillment: receiveMode === "Entrega" ? "delivery" : "pickup",
           p_customer_name: checkoutName.trim(),
           p_customer_phone: checkoutPhone.trim(),
-          p_delivery_address: receiveMode === "Entrega" ? { street: checkoutAddress.trim(), complement: checkoutComplement.trim() || null } : null,
+          p_delivery_address: receiveMode === "Entrega" ? { street: checkoutAddress.trim(), complement: checkoutComplement.trim() || null, delivery_zone_id: selectedDeliveryZone?.id || null, delivery_zone_name: selectedDeliveryZone?.name || null } : null,
           p_payment_method: checkoutPayment === "Dinheiro" ? "cash" : checkoutPayment === "Pix" ? "pix" : "credit_card",
           p_items: cart.map((item) => ({
             product_id: item.dbId || item.id,
@@ -1929,6 +1946,7 @@ _Pedido enviado via Cardápio Digital!_`;
               onBack={() => setView("home")}
               onFinish={() => setFlow("delivery")}
               storeSettings={storeSettings}
+              currentFee={currentFee}
             />
           )}
         </main>
@@ -1963,6 +1981,7 @@ _Pedido enviado via Cardápio Digital!_`;
       )}
       <FlowDrawer
         flow={flow}
+        subtotal={subtotal}
         total={total}
         receiveMode={receiveMode}
         setReceiveMode={setReceiveMode}
@@ -1983,6 +2002,12 @@ _Pedido enviado via Cardápio Digital!_`;
         onSubmit={submitClientOrder}
         currentOrder={currentClientOrder}
         storeSettings={storeSettings}
+        deliveryZones={activeDeliveryZones}
+        selectedDeliveryZoneId={selectedDeliveryZoneId}
+        setSelectedDeliveryZoneId={setSelectedDeliveryZoneId}
+        selectedDeliveryZone={selectedDeliveryZone}
+        currentFee={currentFee}
+        currentMinOrder={currentMinOrder}
         cart={cart}
         checkoutError={checkoutError}
         setCheckoutError={setCheckoutError}
@@ -2177,7 +2202,7 @@ function Combos({ products, openProduct, isStoreOpen }) {
   );
 }
 
-function CartPanel({ cart, subtotal, total, receiveMode, setReceiveMode, updateQty, onBack, onFinish, storeSettings }) {
+function CartPanel({ cart, subtotal, total, receiveMode, setReceiveMode, updateQty, onBack, onFinish, storeSettings, currentFee }) {
   return (
     <aside className="cart-panel is-open" id="cartPanel" aria-label="Carrinho">
       <div className="panel-card">
@@ -2204,7 +2229,7 @@ function CartPanel({ cart, subtotal, total, receiveMode, setReceiveMode, updateQ
           <h3>Resumo do pedido</h3>
           <div><span>Subtotal</span><strong>{money.format(subtotal)}</strong></div>
           {receiveMode === "Entrega" && (
-            <div><span>Taxa de entrega</span><strong>{money.format(storeSettings.deliveryFee)}</strong></div>
+            <div><span>Taxa de entrega</span><strong>{money.format(currentFee)}</strong></div>
           )}
           <div className="total"><span>Total</span><strong>{money.format(total)}</strong></div>
         </div>
@@ -2445,6 +2470,7 @@ function Icon({ name }) {
 
 function FlowDrawer({
   flow,
+  subtotal,
   total,
   receiveMode,
   setReceiveMode,
@@ -2465,6 +2491,12 @@ function FlowDrawer({
   onSubmit,
   currentOrder,
   storeSettings,
+  deliveryZones,
+  selectedDeliveryZoneId,
+  setSelectedDeliveryZoneId,
+  selectedDeliveryZone,
+  currentFee,
+  currentMinOrder,
   cart,
   checkoutError,
   setCheckoutError,
@@ -2566,6 +2598,29 @@ function FlowDrawer({
 
             {receiveMode === "Entrega" && (
               <div className="delivery-fields" style={{ animation: "fadeIn 0.3s ease", display: "flex", flexDirection: "column", gap: "14px", marginTop: "10px" }}>
+                {deliveryZones.length > 0 && (
+                  <label className="field" style={{ margin: 0 }}>
+                    <span style={{ fontWeight: "800", fontSize: "12px", textTransform: "uppercase", color: "#495057" }}>
+                      Area de entrega
+                    </span>
+                    <select
+                      value={selectedDeliveryZoneId}
+                      onChange={(e) => { setSelectedDeliveryZoneId(e.target.value); if (setCheckoutError) setCheckoutError(""); }}
+                      style={{ width: "100%", height: "52px", borderRadius: "12px", border: "1px solid var(--line)", padding: "0 16px", fontSize: "14px", background: "#fff" }}
+                    >
+                      {deliveryZones.map((zone) => (
+                        <option key={zone.id} value={zone.id}>
+                          {zone.name} - taxa {money.format(centsToMoney(zone.delivery_fee_cents))}
+                        </option>
+                      ))}
+                    </select>
+                    {selectedDeliveryZone && (
+                      <small style={{ display: "block", marginTop: "6px", color: "#6c757d", fontWeight: 700 }}>
+                        Taxa: {money.format(currentFee)} - Pedido minimo: {money.format(currentMinOrder)}
+                      </small>
+                    )}
+                  </label>
+                )}
                 <label className="field" style={{ margin: 0 }}>
                   <span style={{ fontWeight: "800", fontSize: "12px", textTransform: "uppercase", color: "#495057", display: "flex", alignItems: "center", gap: "6px" }}>
                     📍 Endereço de entrega
@@ -2603,6 +2658,10 @@ function FlowDrawer({
               onClick={() => {
                 if (receiveMode === "Entrega" && !checkoutAddress.trim()) {
                   setCheckoutError("Por favor, preencha o seu endereço de entrega.");
+                  return;
+                }
+                if (receiveMode === "Entrega" && subtotal < currentMinOrder) {
+                  setCheckoutError(`Pedido minimo para esta area: ${money.format(currentMinOrder)}.`);
                   return;
                 }
                 setCheckoutError("");
@@ -2701,6 +2760,18 @@ function FlowDrawer({
                 {receiveMode === "Entrega" && (
                   <div style={{ fontSize: "12px", color: "#6c757d", borderLeft: "2px solid var(--accent)", paddingLeft: "8px", margin: "2px 0" }}>
                     <strong>Endereço:</strong> {checkoutAddress} {checkoutComplement ? `(${checkoutComplement})` : ""}
+                  </div>
+                )}
+                {receiveMode === "Entrega" && selectedDeliveryZone && (
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <span>Area</span>
+                    <strong>{selectedDeliveryZone.name}</strong>
+                  </div>
+                )}
+                {receiveMode === "Entrega" && (
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <span>Taxa de Entrega</span>
+                    <strong>{money.format(currentFee)}</strong>
                   </div>
                 )}
                 <div style={{ display: "flex", justifyContent: "space-between" }}>
