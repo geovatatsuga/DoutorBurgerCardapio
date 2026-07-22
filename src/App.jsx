@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { isSupabaseConfigured, supabase } from "./lib/supabase";
 import OrdersKanban from "./components/admin/OrdersKanban";
 import OrderHistory from "./components/admin/OrderHistory";
-import { uploadProductImage } from "./services/supabaseData";
+import { uploadProductImage, fetchClientOrder } from "./services/supabaseData";
 
 const money = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 const STORE_SLUG = "burgerc";
@@ -286,8 +286,14 @@ export default function App() {
   const [combo, setCombo] = useState(false);
   const [note, setNote] = useState("");
   const [receiveMode, setReceiveMode] = useState("Entrega");
-  const [flow, setFlow] = useState(null);
-  const [currentClientOrder, setCurrentClientOrder] = useState(null);
+  const [currentClientOrder, setCurrentClientOrder] = useState(() => {
+    try {
+      const saved = localStorage.getItem("doutor_client_order");
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
 
   // Client Checkout Fields
   const [checkoutName, setCheckoutName] = useState("");
@@ -541,6 +547,55 @@ export default function App() {
       orderChannel.removeEventListener("message", handleMessage);
     };
   }, [currentClientOrder]);
+
+  // Persist current client order to localStorage
+  useEffect(() => {
+    if (currentClientOrder) {
+      try {
+        localStorage.setItem("doutor_client_order", JSON.stringify(currentClientOrder));
+      } catch (e) {
+        console.error("LocalStorage error:", e);
+      }
+    }
+  }, [currentClientOrder]);
+
+  // Real-time Supabase listener for client's active order status updates
+  useEffect(() => {
+    if (!supabase || !currentClientOrder?.dbId) return;
+
+    const channel = supabase
+      .channel(`client-order-${currentClientOrder.dbId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "orders",
+          filter: `id=eq.${currentClientOrder.dbId}`,
+        },
+        (payload) => {
+          const statusMap = {
+            received: "Recebido",
+            confirmed: "Confirmado",
+            preparing: "Em preparo",
+            ready: "Pronto",
+            dispatched: "Saiu para entrega",
+            completed: "Entregue",
+            cancelled: "Cancelado",
+          };
+          const newStatus = statusMap[payload.new.status] || payload.new.status;
+          if (newStatus && newStatus !== currentClientOrder.status) {
+            setCurrentClientOrder((prev) => (prev ? { ...prev, status: newStatus } : prev));
+            playNotificationSound("client");
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentClientOrder?.dbId]);
 
   // Sync view status with body classes for styling compatibility
   useEffect(() => {
@@ -1942,6 +1997,8 @@ _Pedido enviado via Cardápio Digital!_`;
           count={count}
           onHome={() => setView("home")}
           onCart={() => setView("cart")}
+          onTrack={() => setFlow("track")}
+          currentClientOrder={currentClientOrder}
           isStoreOpen={isStoreOpen}
           storeSettings={storeSettings}
           deliveryZones={activeDeliveryZones}
@@ -2052,7 +2109,7 @@ _Pedido enviado via Cardápio Digital!_`;
   );
 }
 
-function Header({ count, onHome, onCart, isStoreOpen, storeSettings, deliveryZones }) {
+function Header({ count, onHome, onCart, onTrack, currentClientOrder, isStoreOpen, storeSettings, deliveryZones }) {
   const zoneNames = deliveryZones.map((zone) => zone.name).filter(Boolean);
   const locationLabel = zoneNames.length ? zoneNames.join(", ") : storeSettings.address?.split("-")[0]?.trim() || "Areas de entrega";
   return (
@@ -2080,6 +2137,25 @@ function Header({ count, onHome, onCart, isStoreOpen, storeSettings, deliveryZon
         </span>
       </div>
       <div className="top-actions">
+        {currentClientOrder ? (
+          <button
+            type="button"
+            className="outline-btn"
+            style={{ padding: "6px 12px", fontSize: "12px", borderRadius: "20px", fontWeight: "800", background: "var(--bg)", borderColor: "var(--accent)" }}
+            onClick={onTrack}
+          >
+            🛵 Acompanhar Pedido ({currentClientOrder.status})
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="outline-btn"
+            style={{ padding: "6px 12px", fontSize: "12px", borderRadius: "20px", fontWeight: "800" }}
+            onClick={onTrack}
+          >
+            🔍 Meus Pedidos
+          </button>
+        )}
         <button className="cart-top-btn" onClick={onCart}><Icon name="cart" /> Carrinho <span id="cartBadgeTop">{count}</span></button>
       </div>
     </header>
@@ -2902,30 +2978,145 @@ function FlowDrawer({
           </div>
         )}
 
-        {/* TRACK ORDER TIMELINE */}
-        {flow === "track" && currentOrder && (
+        {/* TRACK ORDER TIMELINE & SEARCH */}
+        {flow === "track" && (
           <div className="flow-screen is-active">
-            <span className="eyebrow" style={{ color: "var(--accent-strong)", fontWeight: "800", textTransform: "uppercase", fontSize: "11px", letterSpacing: "1px" }}>Pedido {currentOrder.id}</span>
-            <h2 style={{ fontSize: "20px", fontWeight: "900", margin: "4px 0 20px" }}>Acompanhar status</h2>
-            <ol className="timeline" style={{ listStyle: "none", padding: 0, margin: "20px 0" }}>
-              {["Recebido", "Em preparo", "Pronto", "Saiu para entrega", "Entregue"].map((step, index) => {
-                const isDone = ["Recebido", "Em preparo", "Pronto", "Saiu para entrega", "Entregue"].indexOf(currentOrder.status) >= index;
-                const isCurrent = currentOrder.status === step;
-                return (
-                  <li key={step} className={isCurrent ? "current" : isDone ? "done" : ""} style={{ display: "flex", gap: "16px", marginBottom: "16px", position: "relative" }}>
-                    <span className="dot" style={{ width: "28px", height: "28px", borderRadius: "50%", background: isCurrent ? "var(--accent)" : isDone ? "#34792f" : "#e9ecef", color: isCurrent || isDone ? "#fff" : "#6c757d", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold", fontSize: "12px", zIndex: 2 }}>{index + 1}</span>
-                    <div style={{ flex: 1 }}>
-                      <strong style={{ fontSize: "14px", color: isCurrent ? "var(--accent-strong)" : isDone ? "#1f2026" : "#868e96", fontWeight: "800" }}>{step}</strong>
-                      <p style={{ margin: "2px 0 0 0", fontSize: "12px", color: isCurrent ? "#495057" : "#6c757d" }}>{isCurrent ? "Esta etapa está ocorrendo agora." : isDone ? "Etapa concluída." : "Aguardando etapas anteriores."}</p>
-                    </div>
-                  </li>
-                );
-              })}
-            </ol>
-            <button className="outline-btn full" onClick={onClose} style={{ marginTop: "20px", height: "52px", borderRadius: "12px", fontWeight: "bold" }}>Fechar</button>
+            {currentOrder ? (
+              <>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span className="eyebrow" style={{ color: "var(--accent-strong)", fontWeight: "800", textTransform: "uppercase", fontSize: "11px", letterSpacing: "1px" }}>
+                    Pedido {currentOrder.displayId || currentOrder.id}
+                  </span>
+                  <span className={`badge badge-${(currentOrder.status || "").toLowerCase().replace(/\s+/g, "")}`}>
+                    {currentOrder.status}
+                  </span>
+                </div>
+                <h2 style={{ fontSize: "20px", fontWeight: "900", margin: "4px 0 16px" }}>Acompanhar Status</h2>
+
+                <div style={{ background: "#f8fafc", padding: "12px 16px", borderRadius: "12px", marginBottom: "16px", fontSize: "13px" }}>
+                  <div><strong>Cliente:</strong> {currentOrder.name}</div>
+                  <div><strong>Forma de Pagamento:</strong> {currentOrder.payment}</div>
+                  <div><strong>Total:</strong> {money.format(currentOrder.total)}</div>
+                </div>
+
+                {currentOrder.status === "Cancelado" ? (
+                  <div style={{ background: "#fee2e2", border: "1px solid #fca5a5", color: "#b91c1c", padding: "14px", borderRadius: "12px", margin: "16px 0", fontSize: "14px" }}>
+                    <strong>❌ Pedido Cancelado</strong>
+                    <p style={{ margin: "4px 0 0", fontSize: "13px" }}>Este pedido foi cancelado pela loja. Em caso de dúvidas, entre em contato via WhatsApp.</p>
+                  </div>
+                ) : (
+                  <ol className="timeline" style={{ listStyle: "none", padding: 0, margin: "20px 0" }}>
+                    {["Recebido", "Confirmado", "Em preparo", "Pronto", "Saiu para entrega", "Entregue"].map((step, index) => {
+                      const stepsList = ["Recebido", "Confirmado", "Em preparo", "Pronto", "Saiu para entrega", "Entregue"];
+                      const isDone = stepsList.indexOf(currentOrder.status) >= index;
+                      const isCurrent = currentOrder.status === step;
+
+                      return (
+                        <li key={step} className={isCurrent ? "current" : isDone ? "done" : ""} style={{ display: "flex", gap: "16px", marginBottom: "16px", position: "relative" }}>
+                          <span className="dot" style={{ width: "28px", height: "28px", borderRadius: "50%", background: isCurrent ? "var(--accent)" : isDone ? "#34792f" : "#e9ecef", color: isCurrent || isDone ? "#fff" : "#6c757d", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold", fontSize: "12px", zIndex: 2 }}>
+                            {isDone && !isCurrent ? "✓" : index + 1}
+                          </span>
+                          <div style={{ flex: 1 }}>
+                            <strong style={{ fontSize: "14px", color: isCurrent ? "var(--accent-strong)" : isDone ? "#1f2026" : "#868e96", fontWeight: "800" }}>{step}</strong>
+                            <p style={{ margin: "2px 0 0 0", fontSize: "12px", color: isCurrent ? "#495057" : "#6c757d" }}>
+                              {isCurrent ? "Esta etapa está ocorrendo agora no Doutor Burger." : isDone ? "Etapa concluída." : "Aguardando etapas anteriores."}
+                            </p>
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ol>
+                )}
+
+                <div style={{ display: "flex", gap: "10px", marginTop: "20px" }}>
+                  <button className="outline-btn" style={{ flex: 1 }} onClick={() => {
+                    if (window.confirm("Deseja buscar outro pedido?")) {
+                      localStorage.removeItem("doutor_client_order");
+                      window.location.reload();
+                    }
+                  }}>
+                    🔍 Buscar outro pedido
+                  </button>
+                  <button className="primary-btn" style={{ flex: 1 }} onClick={onClose}>
+                    Fechar
+                  </button>
+                </div>
+              </>
+            ) : (
+              <TrackOrderSearchForm onClose={onClose} onOrderFound={(ord) => {
+                if (ord) {
+                  localStorage.setItem("doutor_client_order", JSON.stringify(ord));
+                  window.location.reload();
+                }
+              }} />
+            )}
           </div>
         )}
       </section>
+    </div>
+  );
+}
+
+function TrackOrderSearchForm({ onClose, onOrderFound }) {
+  const [searchTerm, setSearchTerm] = React.useState("");
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState("");
+
+  const handleSearch = async (e) => {
+    e.preventDefault();
+    if (!searchTerm.trim()) {
+      setError("Por favor, digite o número do pedido ou WhatsApp.");
+      return;
+    }
+    setLoading(true);
+    setError("");
+    try {
+      const order = await fetchClientOrder(searchTerm);
+      if (!order) {
+        setError("Nenhum pedido encontrado. Verifique o número ou telefone digitado.");
+      } else {
+        onOrderFound(order);
+      }
+    } catch (err) {
+      console.error("Search order error:", err);
+      setError("Erro ao buscar pedido: " + (err.message || err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div>
+      <span className="eyebrow" style={{ color: "var(--accent-strong)", fontWeight: "800", textTransform: "uppercase", fontSize: "11px", letterSpacing: "1px" }}>Consultar Pedido</span>
+      <h2 style={{ fontSize: "20px", fontWeight: "900", margin: "4px 0 16px" }}>Acompanhar meu pedido</h2>
+      <p style={{ fontSize: "13px", color: "var(--muted)", marginBottom: "20px" }}>
+        Informe o número do seu pedido (ex: 103) ou seu telefone cadastrado (com DDD) para acompanhar o status em tempo real.
+      </p>
+
+      <form onSubmit={handleSearch} style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+        <input
+          type="text"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          placeholder="Ex: #103 ou (83) 98765-4321"
+          style={{ width: "100%", height: "52px", borderRadius: "12px", border: "1px solid var(--line)", padding: "0 16px", fontSize: "14px" }}
+        />
+
+        {error && (
+          <div style={{ color: "#d93838", background: "#fdf3f3", padding: "10px 14px", borderRadius: "10px", fontSize: "13px", fontWeight: "700", border: "1px solid #fbc" }}>
+            ⚠️ {error}
+          </div>
+        )}
+
+        <div style={{ display: "flex", gap: "10px", marginTop: "10px" }}>
+          <button className="outline-btn" type="button" onClick={onClose} style={{ flex: 1, height: "48px", borderRadius: "12px" }}>
+            Voltar
+          </button>
+          <button className="primary-btn" type="submit" disabled={loading} style={{ flex: 1.5, height: "48px", borderRadius: "12px" }}>
+            {loading ? "Buscando..." : "Buscar Pedido"}
+          </button>
+        </div>
+      </form>
     </div>
   );
 }

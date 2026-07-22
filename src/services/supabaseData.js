@@ -322,3 +322,32 @@ export async function loadOrderHistory(filters = {}) {
   return mapped;
 }
 
+export async function fetchClientOrder(searchTerm) {
+  const client = requireSupabase();
+  if (!searchTerm) return null;
+  const term = String(searchTerm).trim().replace("#", "");
+
+  let query = client
+    .from("orders")
+    .select("*, payments(method,status), order_items(product_name, quantity, unit_price_cents, notes)")
+    .eq("store_id", STORE_ID)
+    .order("created_at", { ascending: false });
+
+  if (/^\d+$/.test(term) && term.length < 9) {
+    query = query.eq("order_number", parseInt(term, 10));
+  } else {
+    const cleanPhone = term.replace(/\D/g, "");
+    if (cleanPhone.length >= 8) {
+      query = query.ilike("customer_phone", `%${cleanPhone}%`);
+    } else {
+      query = query.eq("id", term);
+    }
+  }
+
+  const { data, error } = await query.limit(1);
+  if (error) throw error;
+  if (!data || data.length === 0) return null;
+  return mapOrder(data[0]);
+}
+
+
