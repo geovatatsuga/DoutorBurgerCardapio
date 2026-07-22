@@ -42,39 +42,7 @@ create index if not exists idx_order_status_history_order_id on public.order_sta
 create index if not exists idx_orders_store_created on public.orders (store_id, created_at desc);
 create index if not exists idx_orders_status on public.orders (store_id, status);
 
--- 4. Create default Store Admin User ('admin@doutorburger.com' / 'DoutorBurger2026!')
-do $$
-declare
-  v_user_id uuid := gen_random_uuid();
-  v_store_id uuid;
-  v_encrypted_pw text;
-begin
-  select id into v_store_id from public.stores where slug = 'burgerc' limit 1;
-  if v_store_id is null then
-    return;
-  end if;
-  
-  v_encrypted_pw := crypt('DoutorBurger2026!', gen_salt('bf'));
-
-  if not exists (select 1 from auth.users where email = 'admin@doutorburger.com') then
-    insert into auth.users (
-      instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
-      raw_app_meta_data, raw_user_meta_data, created_at, updated_at
-    ) values (
-      '00000000-0000-0000-0000-000000000000', v_user_id, 'authenticated', 'authenticated',
-      'admin@doutorburger.com', v_encrypted_pw, now(),
-      '{"provider":"email","providers":["email"]}', '{"full_name":"Gerente Doutor Burger"}', now(), now()
-    );
-  else
-    select id into v_user_id from auth.users where email = 'admin@doutorburger.com';
-    update auth.users set encrypted_password = v_encrypted_pw, email_confirmed_at = now() where id = v_user_id;
-  end if;
-
-  insert into public.store_memberships (store_id, user_id, role, is_active)
-  values (v_store_id, v_user_id, 'owner', true)
-  on conflict (store_id, user_id) do update set role = 'owner', is_active = true;
-
-end $$;
+-- 3. RPC to fetch detailed order status timeline with profile/email info
 create or replace function public.get_order_status_timeline(p_order_id uuid)
 returns table (
   id uuid,
