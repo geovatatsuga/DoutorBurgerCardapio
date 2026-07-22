@@ -286,6 +286,7 @@ export default function App() {
   const [combo, setCombo] = useState(false);
   const [note, setNote] = useState("");
   const [receiveMode, setReceiveMode] = useState("Entrega");
+  const [flow, setFlow] = useState(null);
   const [currentClientOrder, setCurrentClientOrder] = useState(() => {
     try {
       const saved = localStorage.getItem("doutor_client_order");
