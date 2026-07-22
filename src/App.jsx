@@ -329,6 +329,7 @@ export default function App() {
   const [receiptOrder, setReceiptOrder] = useState(null);
   const [receiptType, setReceiptType] = useState("fiscal"); // "fiscal" or "cozinha"
   const [session, setSession] = useState(null);
+  const [authReady, setAuthReady] = useState(!supabase);
   const [supabaseNotice, setSupabaseNotice] = useState("");
   const [activeStoreId, setActiveStoreId] = useState(null);
   const [currentStaffRole, setCurrentStaffRole] = useState(null);
@@ -351,13 +352,23 @@ export default function App() {
   useEffect(() => {
     if (!supabase) return;
 
-    supabase.auth.getSession().then(({ data }) => setSession(data.session));
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session);
+      setAuthReady(true);
+    });
     const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       setSession(nextSession);
+      setAuthReady(true);
     });
 
     return () => listener.subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (authReady && !session && (page === "admin" || page === "kitchen")) {
+      setPage("login");
+    }
+  }, [authReady, session, page]);
 
   useEffect(() => {
     if (!supabase) return;
@@ -425,6 +436,33 @@ export default function App() {
 
     loadCatalog();
   }, []);
+
+  useEffect(() => {
+    if (!supabase || !session || !activeStoreId) return;
+
+    async function loadCurrentMembership() {
+      const { data, error } = await supabase
+        .from("store_memberships")
+        .select("role")
+        .eq("store_id", activeStoreId)
+        .eq("user_id", session.user.id)
+        .eq("is_active", true)
+        .maybeSingle();
+
+      if (error || !data) {
+        setCurrentStaffRole(null);
+        if (page === "admin" || page === "kitchen") setPage("login");
+        return;
+      }
+
+      setCurrentStaffRole(data.role);
+      if ((data.role === "kitchen" || data.role === "cashier") && adminTab !== "orders") {
+        setAdminTab("orders");
+      }
+    }
+
+    loadCurrentMembership();
+  }, [session, activeStoreId, page, adminTab]);
 
   useEffect(() => {
     if (!supabase || !session || !activeStoreId) return;
@@ -876,6 +914,11 @@ _Pedido enviado via Cardápio Digital!_`;
     setPage("client");
   }
 
+  function goToAdminOrders() {
+    setAdminTab("orders");
+    setPage("admin");
+  }
+
   // Edit or Add Product Form Submission
   function openAddProduct() {
     setEditingProduct({ id: "new" });
@@ -1196,6 +1239,32 @@ _Pedido enviado via Cardápio Digital!_`;
     );
   }
 
+  if ((page === "admin" || page === "kitchen") && !authReady) {
+    return (
+      <main className="admin-login">
+        <section>
+          <span className="brand-mark"><img src="/assets/brand/logo.png" alt="Doutor Burger Logo" width="64" height="64" decoding="async" /></span>
+          <h1>Carregando painel...</h1>
+          <p>Conferindo sua sessao e permissao da loja.</p>
+        </section>
+      </main>
+    );
+  }
+
+  if ((page === "admin" || page === "kitchen") && !session) return null;
+
+  if ((page === "admin" || page === "kitchen") && !currentStaffRole) {
+    return (
+      <main className="admin-login">
+        <section>
+          <span className="brand-mark"><img src="/assets/brand/logo.png" alt="Doutor Burger Logo" width="64" height="64" decoding="async" /></span>
+          <h1>Carregando permissao...</h1>
+          <p>Buscando seu cargo na BurgerC.</p>
+        </section>
+      </main>
+    );
+  }
+
   if (page === "kitchen") {
     const activeKitchenOrders = orders.filter(o => ["Recebido", "Confirmado", "Em preparo"].includes(o.status));
     return (
@@ -1205,7 +1274,7 @@ _Pedido enviado via Cardápio Digital!_`;
             <h1>Painel da Cozinha (KDS)</h1>
             <span style={{ color: "#66707c" }}>{activeKitchenOrders.length} pedido(s) em andamento</span>
           </div>
-          <button className="outline-btn" style={{ background: "#1f252d", color: "#fff", borderColor: "#3a4659" }} onClick={() => setPage("admin")}>
+          <button className="outline-btn" style={{ background: "#1f252d", color: "#fff", borderColor: "#3a4659" }} onClick={goToAdminOrders}>
             Voltar ao Admin
           </button>
         </header>
