@@ -569,6 +569,7 @@ export default function App() {
       setView("home");
       return;
     }
+    const isBurger = selectedProduct?.category === "Burgers";
     const semIngredientsText = removedIngredients.length > 0 ? `Sem: ${removedIngredients.join(", ")}` : "";
     const uniqueKey = Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
     setCart((items) => [
@@ -576,11 +577,11 @@ export default function App() {
       {
         key: uniqueKey,
         id: selectedProduct.id,
-        name: combo ? `${selectedProduct.name} Combo` : selectedProduct.name,
+        name: isBurger && combo ? `${selectedProduct.name} Combo` : selectedProduct.name,
         image: selectedProduct.image,
         price: detailUnitPrice,
         qty: detailQty,
-        notes: [semIngredientsText, meat, ...extras.map((item) => item.name), note.trim()].filter(Boolean).join(" + "),
+        notes: [semIngredientsText, isBurger ? meat : "", ...extras.map((item) => item.name), note.trim()].filter(Boolean).join(" + "),
       },
     ]);
     setView("cart");
@@ -2174,6 +2175,9 @@ function ProductDetail({
 
   const galleryImages = useMemo(() => {
     if (!product) return [];
+    if (product.category === "Bebidas") {
+      return [product.image];
+    }
     if (product.id === "doutor") {
       return [
         "/assets/new-direction/doutor-burger.webp",
@@ -2216,12 +2220,13 @@ function ProductDetail({
       prev.includes(name) ? prev.filter((item) => item !== name) : [...prev, name]
     );
   };
+  const isBurger = product?.category === "Burgers";
   const extrasTotal = extras.reduce((sum, item) => sum + item.price, 0);
-  const comboPrice = combo ? 11.9 : 0;
+  const comboPrice = isBurger && combo ? 11.9 : 0;
 
   return (
     <div className="drawer is-open" id="productDrawer" aria-hidden="false">
-      <section className="drawer-card product-detail" role="dialog" aria-modal="true" aria-label="Detalhe do produto">
+      <section className={`drawer-card product-detail ${product?.category === "Bebidas" ? "drink-detail" : ""}`} role="dialog" aria-modal="true" aria-label="Detalhe do produto">
         <nav className="detail-breadcrumb" aria-label="Caminho">
           <button className="back-link" onClick={onBack} type="button">←</button>
           <span>Inicio</span>

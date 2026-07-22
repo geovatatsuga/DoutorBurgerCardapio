@@ -6339,6 +6339,38 @@ body.detail-mode .detail-thumbs img.is-active {
   border-color: #f0a000 !important;
 }
 
+body.detail-mode .drawer-card.product-detail.drink-detail {
+  grid-template-columns: minmax(420px, 0.85fr) minmax(560px, 1fr) !important;
+}
+
+body.detail-mode .drink-detail .detail-gallery {
+  align-items: center !important;
+  background: #ffffff !important;
+  display: flex !important;
+  justify-content: center !important;
+  min-height: 620px !important;
+}
+
+body.detail-mode .drink-detail .detail-image {
+  background: #ffffff !important;
+  display: block !important;
+  margin: 0 auto !important;
+  max-height: 560px !important;
+  object-fit: contain !important;
+  object-position: center center !important;
+  width: min(100%, 520px) !important;
+}
+
+body.detail-mode .drink-detail .detail-thumbs,
+body.detail-mode .drink-detail .removal-section,
+body.detail-mode .drink-detail .extras-section,
+body.detail-mode .drink-detail .meat-choice,
+body.detail-mode .drink-detail .detail-combo-card,
+body.detail-mode .drink-detail .detail-order-summary > div:nth-of-type(2),
+body.detail-mode .drink-detail .detail-order-summary > div:nth-of-type(3) {
+  display: none !important;
+}
+
 body.detail-mode .detail-copy {
   display: grid !important;
   gap: 10px 12px !important;
