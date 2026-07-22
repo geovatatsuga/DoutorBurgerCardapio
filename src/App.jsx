@@ -1448,12 +1448,63 @@ _Pedido enviado via Cardápio Digital!_`;
                   <label className="field" style={{ marginTop: "12px" }}>Descrição / Ingredientes
                     <textarea value={productFormDesc} onChange={(e) => setProductFormDesc(e.target.value)} style={{ width: "100%", minHeight: "80px", borderRadius: "16px", padding: "12px", border: "1px solid var(--line)" }} />
                   </label>
-                  <label className="field" style={{ marginTop: "12px" }}>Imagem do produto
-                    <div className="image-upload-box">
-                      <div className="file-input-wrapper">
-                        <label className="btn-upload-file">
-                          📁 Selecionar foto para upload
+                  <div className="field-group" style={{ marginTop: "16px" }}>
+                    <span className="field-label" style={{ display: "block", fontWeight: 700, fontSize: "14px", marginBottom: "8px" }}>
+                      Imagem do produto
+                    </span>
+
+                    <div className="image-upload-card" style={{
+                      background: "#fff8ec",
+                      border: "2px dashed var(--accent)",
+                      borderRadius: "16px",
+                      padding: "16px",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "12px",
+                    }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "16px", flexWrap: "wrap" }}>
+                        {productFormImage ? (
+                          <img
+                            src={productFormImage}
+                            alt="Preview do produto"
+                            style={{ width: "80px", height: "80px", borderRadius: "12px", objectFit: "cover", border: "2px solid var(--line)" }}
+                          />
+                        ) : (
+                          <div style={{ width: "80px", height: "80px", borderRadius: "12px", background: "#f1f5f9", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "28px" }}>
+                            🍔
+                          </div>
+                        )}
+
+                        <div style={{ display: "flex", flexDirection: "column", gap: "6px", flex: 1 }}>
+                          <strong>{productFormImage ? "Foto selecionada" : "Enviar foto do dispositivo"}</strong>
+                          <small style={{ color: "var(--muted)" }}>Formato PNG, JPG ou WEBP. A foto será enviada diretamente para o Supabase Storage.</small>
+                          
+                          <div style={{ display: "flex", gap: "10px", marginTop: "4px" }}>
+                            <button
+                              type="button"
+                              className="primary-btn"
+                              style={{ padding: "8px 16px", fontSize: "13px", background: "var(--accent-strong)" }}
+                              disabled={uploadingImage}
+                              onClick={() => {
+                                document.getElementById("product-file-input")?.click();
+                              }}
+                            >
+                              {uploadingImage ? "⏳ Enviando..." : "📁 Escolher Imagem do PC"}
+                            </button>
+                            {productFormImage && (
+                              <button
+                                type="button"
+                                className="outline-btn"
+                                style={{ padding: "8px 14px", fontSize: "13px" }}
+                                onClick={() => setProductFormImage("")}
+                              >
+                                Remover Foto
+                              </button>
+                            )}
+                          </div>
+
                           <input
+                            id="product-file-input"
                             type="file"
                             accept="image/*"
                             style={{ display: "none" }}
@@ -1472,19 +1523,21 @@ _Pedido enviado via Cardápio Digital!_`;
                               }
                             }}
                           />
-                        </label>
-                        {uploadingImage && <small style={{ color: "var(--accent-strong)", fontWeight: 700 }}>Enviando imagem para o Supabase Storage...</small>}
-                        {productFormImage && (
-                          <img src={productFormImage} alt="Preview" className="upload-preview-thumb" />
-                        )}
+                        </div>
                       </div>
-                      <input
-                        value={productFormImage}
-                        onChange={(e) => setProductFormImage(e.target.value)}
-                        placeholder="/assets/products/foto.webp ou URL pública da imagem"
-                      />
+
+                      <div style={{ display: "flex", flexDirection: "column", gap: "4px", borderTop: "1px solid var(--line)", paddingTop: "10px" }}>
+                        <small style={{ fontWeight: 700, color: "var(--muted)" }}>URL da imagem (preenchimento automático ou manual):</small>
+                        <input
+                          type="text"
+                          value={productFormImage}
+                          onChange={(e) => setProductFormImage(e.target.value)}
+                          placeholder="/assets/products/foto.webp ou https://..."
+                          style={{ width: "100%", padding: "10px 14px", borderRadius: "10px", border: "1px solid var(--line)", font: "inherit", fontSize: "13px" }}
+                        />
+                      </div>
                     </div>
-                  </label>
+                  </div>
                   <div style={{ display: "flex", gap: "10px", marginTop: "16px" }}>
                     <button className="primary-btn" type="submit">Salvar Produto</button>
                     <button className="outline-btn" type="button" onClick={() => setEditingProduct(null)}>Cancelar</button>
