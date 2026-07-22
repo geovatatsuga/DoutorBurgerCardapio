@@ -11,15 +11,15 @@ create policy "Images bucket public select"
   on storage.objects for select
   using (bucket_id = 'Images');
 
-drop policy if exists "Images bucket staff insert" on storage.objects;
-create policy "Images bucket staff insert"
+drop policy if exists "Images bucket public insert" on storage.objects;
+create policy "Images bucket public insert"
   on storage.objects for insert
-  with check (bucket_id = 'Images' and auth.role() = 'authenticated');
+  with check (bucket_id = 'Images');
 
-drop policy if exists "Images bucket staff update" on storage.objects;
-create policy "Images bucket staff update"
+drop policy if exists "Images bucket public update" on storage.objects;
+create policy "Images bucket public update"
   on storage.objects for update
-  using (bucket_id = 'Images' and auth.role() = 'authenticated');
+  using (bucket_id = 'Images');
 
 -- Storage policies for product-images bucket
 drop policy if exists "Product images public select" on storage.objects;
@@ -27,15 +27,15 @@ create policy "Product images public select"
   on storage.objects for select
   using (bucket_id = 'product-images');
 
-drop policy if exists "Product images staff insert" on storage.objects;
-create policy "Product images staff insert"
+drop policy if exists "Product images public insert" on storage.objects;
+create policy "Product images public insert"
   on storage.objects for insert
-  with check (bucket_id = 'product-images' and auth.role() = 'authenticated');
+  with check (bucket_id = 'product-images');
 
-drop policy if exists "Product images staff update" on storage.objects;
-create policy "Product images staff update"
+drop policy if exists "Product images public update" on storage.objects;
+create policy "Product images public update"
   on storage.objects for update
-  using (bucket_id = 'product-images' and auth.role() = 'authenticated');
+  using (bucket_id = 'product-images');
 
 -- 2. Indexes for fast order status history lookup and sorting
 create index if not exists idx_order_status_history_order_id on public.order_status_history (order_id, created_at desc);
