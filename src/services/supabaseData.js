@@ -232,3 +232,93 @@ export async function deleteProductRemote(productId) {
   const { error } = await client.from("products").update({ is_active: false }).eq("id", productId);
   if (error) throw error;
 }
+
+export async function uploadProductImage(file) {
+  const client = requireSupabase();
+  if (!file) throw new Error("Nenhum arquivo fornecido.");
+
+  const fileExt = file.name.split(".").pop();
+  const fileName = `product_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${fileExt}`;
+  const filePath = `${fileName}`;
+
+  const { error: uploadError } = await client.storage
+    .from("product-images")
+    .upload(filePath, file, { cacheControl: "3600", upsert: true });
+
+  if (uploadError) {
+    console.error("Storage upload error:", uploadError);
+    throw uploadError;
+  }
+
+  const { data: publicUrlData } = client.storage
+    .from("product-images")
+    .getPublicUrl(filePath);
+
+  return publicUrlData.publicUrl;
+}
+
+export async function fetchOrderStatusTimeline(orderId) {
+  const client = requireSupabase();
+  const { data, error } = await client.rpc("get_order_status_timeline", {
+    p_order_id: orderId,
+  });
+  if (error) throw error;
+  return data || [];
+}
+
+export async function loadOrderHistory(filters = {}) {
+  const client = requireSupabase();
+  let query = client
+    .from("orders")
+    .select("*, payments(method,status), order_items(product_name, quantity, unit_price_cents, notes)")
+    .eq("store_id", STORE_ID)
+    .order("created_at", { ascending: false });
+
+  if (filters.startDate) {
+    query = query.gte("created_at", new Date(filters.startDate).toISOString());
+  }
+  if (filters.endDate) {
+    const end = new Date(filters.endDate);
+    end.setHours(23, 59, 59, 999);
+    query = query.lte("created_at", end.toISOString());
+  }
+  if (filters.status && filters.status !== "all") {
+    query = query.eq("status", statusToDb[filters.status] || filters.status);
+  }
+  if (filters.fulfillment && filters.fulfillment !== "all") {
+    query = query.eq("fulfillment", filters.fulfillment);
+  }
+
+  const limit = filters.limit || 200;
+  query = query.limit(limit);
+
+  const { data, error } = await query;
+  if (error) throw error;
+
+  let mapped = (data || []).map(mapOrder);
+
+  if (filters.search) {
+    const searchLower = filters.search.toLowerCase().trim();
+    mapped = mapped.filter(
+      (order) =>
+        order.displayId.toLowerCase().includes(searchLower) ||
+        order.name.toLowerCase().includes(searchLower) ||
+        order.phone.includes(searchLower)
+    );
+  }
+
+  if (filters.paymentMethod && filters.paymentMethod !== "all") {
+    mapped = mapped.filter((o) => o.payment === filters.paymentMethod);
+  }
+
+  if (filters.minTotal) {
+    mapped = mapped.filter((o) => o.total >= Number(filters.minTotal));
+  }
+
+  if (filters.maxTotal) {
+    mapped = mapped.filter((o) => o.total <= Number(filters.maxTotal));
+  }
+
+  return mapped;
+}
+

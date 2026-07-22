@@ -1,5 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { isSupabaseConfigured, supabase } from "./lib/supabase";
+import OrdersKanban from "./components/admin/OrdersKanban";
+import OrderHistory from "./components/admin/OrderHistory";
+import { uploadProductImage } from "./services/supabaseData";
 
 const money = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 const STORE_SLUG = "burgerc";
@@ -308,6 +311,7 @@ export default function App() {
   const [productFormPrice, setProductFormPrice] = useState("");
   const [productFormDesc, setProductFormDesc] = useState("");
   const [productFormImage, setProductFormImage] = useState("");
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [productFormActive, setProductFormActive] = useState(true);
   const [categoryFormName, setCategoryFormName] = useState("");
   const [categoryFormIcon, setCategoryFormIcon] = useState("burger");
@@ -1354,7 +1358,8 @@ _Pedido enviado via Cardápio Digital!_`;
             <span><strong>{storeSettings.name}</strong><small>Painel da loja</small></span>
           </a>
           <nav>
-            <button className={adminTab === "orders" ? "is-active" : ""} onClick={() => setAdminTab("orders")}>Pedidos</button>
+            <button className={adminTab === "orders" ? "is-active" : ""} onClick={() => setAdminTab("orders")}>Pedidos (Kanban)</button>
+            <button className={adminTab === "history" ? "is-active" : ""} onClick={() => setAdminTab("history")}>Histórico</button>
             {canManageCatalog && <button className={adminTab === "menu" ? "is-active" : ""} onClick={() => setAdminTab("menu")}>Cardapio</button>}
             {canManageCatalog && <button className={adminTab === "categories" ? "is-active" : ""} onClick={() => setAdminTab("categories")}>Categorias</button>}
             {canManageCatalog && <button className={adminTab === "modifiers" ? "is-active" : ""} onClick={() => setAdminTab("modifiers")}>Adicionais</button>}
@@ -1389,109 +1394,25 @@ _Pedido enviado via Cardápio Digital!_`;
                 <article><span>Pedidos Hoje</span><strong>{orders.length}</strong></article>
               </div>
 
-              <div className="orders-layout">
-                <div className="order-list">
-                  {orders.map(order => (
-                    <article
-                      key={order.id}
-                      className={`order-ticket ${selectedAdminOrderId === order.id ? "is-active" : ""} ${order.origin === "iFood" ? "origin-ifood" : ""}`}
-                      onClick={() => setSelectedAdminOrderId(order.id)}
-                    >
-                      <strong>{order.id}</strong>
-                      <p>{order.name}</p>
-                      <span>{order.time} - {order.origin}</span>
-                      <strong>{money.format(order.total)}</strong>
-                      <span className={`badge badge-${order.status.toLowerCase().replace(" ", "")}`}>
-                        {order.status}
-                      </span>
-                    </article>
-                  ))}
-                </div>
+              <OrdersKanban
+                orders={orders}
+                onUpdateStatus={updateOrderStatus}
+                onPrintReceipt={(ord) => setReceiptOrder(ord)}
+                savingOrderId={savingOrderId}
+              />
+            </section>
+          )}
 
-                {selectedAdminOrder && (
-                  <article className="order-detail">
-                    <div className="panel-head">
-                      <div>
-                        <span className="eyebrow">{selectedAdminOrder.origin}</span>
-                        <h2>Pedido {selectedAdminOrder.id}</h2>
-                      </div>
-                      <span className={`badge badge-${selectedAdminOrder.status.toLowerCase().replace(" ", "")}`}>
-                        {selectedAdminOrder.status}
-                      </span>
-                    </div>
-
-                    <div className="customer-card">
-                      <strong>{selectedAdminOrder.name}</strong>
-                      <span>WhatsApp: {selectedAdminOrder.phone}</span>
-                      <span>Endereço: {selectedAdminOrder.address}</span>
-                      {selectedAdminOrder.complement && <span>Complemento: {selectedAdminOrder.complement}</span>}
-                    </div>
-
-                    <div className="admin-items">
-                      {selectedAdminOrder.items.map((item, idx) => (
-                        <div key={idx} style={{ flexDirection: "column", gap: "2px" }}>
-                          <div style={{ display: "flex", justifyContent: "space-between", width: "100%" }}>
-                            <span>{item.qty}x {item.name}</span>
-                            <strong>{money.format(item.price * item.qty)}</strong>
-                          </div>
-                          {item.notes && <small style={{ color: "var(--muted)", fontStyle: "italic", marginLeft: "14px" }}>- {item.notes}</small>}
-                        </div>
-                      ))}
-                      <hr style={{ border: 0, borderTop: "1px solid var(--line)", margin: "8px 0" }} />
-                      <div><span>Subtotal</span><span>{money.format(selectedAdminOrder.subtotal)}</span></div>
-                      <div><span>Taxa de Entrega</span><span>{money.format(selectedAdminOrder.deliveryFee)}</span></div>
-                      <div className="total"><span>Total</span><span>{money.format(selectedAdminOrder.total)}</span></div>
-                    </div>
-
-                    <h3>Atualizar Status</h3>
-                    <div className="status-actions">
-                      {orderStatusLabels.map(st => {
-                        const isAllowed = selectedStatusOptions.includes(st);
-                        return (
-                        <button
-                          key={st}
-                          type="button"
-                          disabled={!isAllowed || savingOrderId === selectedAdminOrder.id}
-                          className={selectedPendingStatus === st ? "is-active" : ""}
-                          onClick={() => setPendingOrderStatuses((prev) => ({ ...prev, [selectedAdminOrder.id]: st }))}
-                          title={!isAllowed ? `Nao permitido a partir de ${selectedAdminOrder.status}` : ""}
-                        >
-                          {st}
-                        </button>
-                        );
-                      })}
-                    </div>
-                    {hasPendingStatusChange && (
-                      <p style={{ margin: "8px 0 0", color: "var(--muted)", fontWeight: 700 }}>
-                        Alteracao pendente: {selectedAdminOrder.status} para {selectedPendingStatus}
-                      </p>
-                    )}
-
-                    <div className="admin-buttons">
-                      <button
-                        className="primary-btn"
-                        type="button"
-                        disabled={!hasPendingStatusChange || savingOrderId === selectedAdminOrder.id}
-                        onClick={() => updateOrderStatus(selectedAdminOrder.id, selectedPendingStatus, { skipConfirm: true, reason: "Salvo no painel de pedidos" })}
-                      >
-                        {savingOrderId === selectedAdminOrder.id ? "Salvando..." : "Salvar atualizacao"}
-                      </button>
-                      <button className="outline-btn" onClick={() => setReceiptOrder(selectedAdminOrder)}>Imprimir Recibo</button>
-                      <a
-                        className="outline-btn"
-                        href={`https://wa.me/55${selectedAdminOrder.phone.replace(/\D/g, "")}?text=Olá ${selectedAdminOrder.name}! Seu pedido ${selectedAdminOrder.id} foi atualizado para: ${selectedAdminOrder.status}.`}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        Enviar WhatsApp
-                      </a>
-                      {selectedAdminOrder.status !== "Cancelado" && (
-                        <button className="danger-btn" onClick={() => cancelOrder(selectedAdminOrder.id)}>Cancelar Pedido</button>
-                      )}
-                    </div>
-                  </article>
-                )}
-              </div>
+          {adminTab === "history" && (
+            <section className="admin-tab">
+              <OrderHistory
+                onPrintReceipt={(ord) => setReceiptOrder(ord)}
+                onUpdateStatus={updateOrderStatus}
+                savingOrderId={savingOrderId}
+                onDuplicateOrder={(ord) => {
+                  alert(`Criando duplicação do pedido ${ord.displayId || ord.id}. Redirecionando para novo atendimento...`);
+                }}
+              />
             </section>
           )}
 
@@ -1528,7 +1449,41 @@ _Pedido enviado via Cardápio Digital!_`;
                     <textarea value={productFormDesc} onChange={(e) => setProductFormDesc(e.target.value)} style={{ width: "100%", minHeight: "80px", borderRadius: "16px", padding: "12px", border: "1px solid var(--line)" }} />
                   </label>
                   <label className="field" style={{ marginTop: "12px" }}>Imagem do produto
-                    <input value={productFormImage} onChange={(e) => setProductFormImage(e.target.value)} placeholder="/assets/products/foto.webp ou URL da imagem" />
+                    <div className="image-upload-box">
+                      <div className="file-input-wrapper">
+                        <label className="btn-upload-file">
+                          📁 Selecionar foto para upload
+                          <input
+                            type="file"
+                            accept="image/*"
+                            style={{ display: "none" }}
+                            disabled={uploadingImage}
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              try {
+                                setUploadingImage(true);
+                                const url = await uploadProductImage(file);
+                                setProductFormImage(url);
+                              } catch (err) {
+                                alert("Erro ao enviar imagem para o Supabase Storage: " + (err.message || err));
+                              } finally {
+                                setUploadingImage(false);
+                              }
+                            }}
+                          />
+                        </label>
+                        {uploadingImage && <small style={{ color: "var(--accent-strong)", fontWeight: 700 }}>Enviando imagem para o Supabase Storage...</small>}
+                        {productFormImage && (
+                          <img src={productFormImage} alt="Preview" className="upload-preview-thumb" />
+                        )}
+                      </div>
+                      <input
+                        value={productFormImage}
+                        onChange={(e) => setProductFormImage(e.target.value)}
+                        placeholder="/assets/products/foto.webp ou URL pública da imagem"
+                      />
+                    </div>
                   </label>
                   <div style={{ display: "flex", gap: "10px", marginTop: "16px" }}>
                     <button className="primary-btn" type="submit">Salvar Produto</button>
@@ -1913,7 +1868,17 @@ _Pedido enviado via Cardápio Digital!_`;
   return (
     <>
       <div className="app-shell">
-        <Header count={count} onHome={() => setView("home")} onCart={() => setView("cart")} onDelivery={() => setFlow("delivery")} isStoreOpen={isStoreOpen} storeSettings={storeSettings} selectedDeliveryZone={selectedDeliveryZone} />
+        <Header
+          count={count}
+          onHome={() => setView("home")}
+          onCart={() => setView("cart")}
+          isStoreOpen={isStoreOpen}
+          storeSettings={storeSettings}
+          deliveryZones={activeDeliveryZones}
+          selectedDeliveryZoneId={selectedDeliveryZoneId}
+          setSelectedDeliveryZoneId={setSelectedDeliveryZoneId}
+          selectedDeliveryZone={selectedDeliveryZone}
+        />
         <main className="customer-grid">
           {/* Closed notice block - compact */}
           {!isStoreOpen && (
@@ -2019,7 +1984,7 @@ _Pedido enviado via Cardápio Digital!_`;
   );
 }
 
-function Header({ count, onHome, onCart, onDelivery, isStoreOpen, storeSettings, selectedDeliveryZone }) {
+function Header({ count, onHome, onCart, isStoreOpen, storeSettings, deliveryZones, selectedDeliveryZoneId, setSelectedDeliveryZoneId, selectedDeliveryZone }) {
   const locationLabel = selectedDeliveryZone?.name || storeSettings.address?.split("-")[0]?.trim() || "Area de entrega";
   return (
     <header className="topbar">
@@ -2028,10 +1993,24 @@ function Header({ count, onHome, onCart, onDelivery, isStoreOpen, storeSettings,
         <span><strong>{storeSettings.name}</strong><small>Cura sua fome</small></span>
       </a>
       <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-        <button className="location-pill" onClick={onDelivery}>
+        <label className="location-pill location-select">
           <Icon name="pin" />
-          <span>{locationLabel}</span>
-        </button>
+          {deliveryZones.length > 0 ? (
+            <select
+              aria-label="Area de entrega"
+              value={selectedDeliveryZoneId}
+              onChange={(event) => setSelectedDeliveryZoneId(event.target.value)}
+            >
+              {deliveryZones.map((zone) => (
+                <option key={zone.id} value={zone.id}>
+                  {zone.name} - {money.format(centsToMoney(zone.delivery_fee_cents))}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <span>{locationLabel}</span>
+          )}
+        </label>
         <span style={{
           background: isStoreOpen ? "#ecf8e8" : "#fee3e3",
           color: isStoreOpen ? "#27852c" : "#c94b3a",
