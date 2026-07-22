@@ -233,17 +233,83 @@ export async function deleteProductRemote(productId) {
   if (error) throw error;
 }
 
-export async function uploadProductImage(file) {
-  const client = requireSupabase();
-  if (!file) throw new Error("Nenhum arquivo fornecido.");
+export async function convertImageToWebP(file, quality = 0.85, maxDimension = 1200) {
+  if (!file || !file.type?.startsWith("image/")) {
+    return file;
+  }
+  if (file.type === "image/webp" && file.size < 500 * 1024) {
+    return file;
+  }
 
-  const fileExt = file.name.split(".").pop();
-  const fileName = `product_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${fileExt}`;
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        let width = img.width;
+        let height = img.height;
+
+        if (width > maxDimension || height > maxDimension) {
+          if (width > height) {
+            height = Math.round((height * maxDimension) / width);
+            width = maxDimension;
+          } else {
+            width = Math.round((width * maxDimension) / height);
+            height = maxDimension;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, width, height);
+
+        canvas.toBlob(
+          (blob) => {
+            if (!blob) return resolve(file);
+            const webpFile = new File(
+              [blob],
+              file.name.replace(/\.[^/.]+$/, "") + ".webp",
+              { type: "image/webp", lastModified: Date.now() }
+            );
+            resolve(webpFile);
+          },
+          "image/webp",
+          quality
+        );
+      };
+      img.onerror = () => resolve(file);
+      img.src = e.target.result;
+    };
+    reader.onerror = () => resolve(file);
+    reader.readAsDataURL(file);
+  });
+}
+
+export async function uploadProductImage(rawFile) {
+  const client = requireSupabase();
+  if (!rawFile) throw new Error("Nenhum arquivo fornecido.");
+
+  // Convert image to WEBP before uploading
+  const file = await convertImageToWebP(rawFile);
+
+  const fileName = `prod_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.webp`;
   const filePath = `${fileName}`;
 
-  const { error: uploadError } = await client.storage
-    .from("product-images")
-    .upload(filePath, file, { cacheControl: "3600", upsert: true });
+  let bucketName = "Images";
+  let { error: uploadError } = await client.storage
+    .from(bucketName)
+    .upload(filePath, file, { cacheControl: "3600", upsert: true, contentType: "image/webp" });
+
+  if (uploadError && (uploadError.message?.toLowerCase().includes("not found") || uploadError.error === "Bucket not found")) {
+    bucketName = "product-images";
+    const res = await client.storage
+      .from(bucketName)
+      .upload(filePath, file, { cacheControl: "3600", upsert: true, contentType: "image/webp" });
+    uploadError = res.error;
+  }
 
   if (uploadError) {
     console.error("Storage upload error:", uploadError);
@@ -251,7 +317,7 @@ export async function uploadProductImage(file) {
   }
 
   const { data: publicUrlData } = client.storage
-    .from("product-images")
+    .from(bucketName)
     .getPublicUrl(filePath);
 
   return publicUrlData.publicUrl;

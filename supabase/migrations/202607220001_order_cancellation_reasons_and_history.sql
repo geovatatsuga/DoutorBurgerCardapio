@@ -1,9 +1,25 @@
 -- Migration 202607220001: Order Cancellation Reasons, Status Timeline RPC, and Supabase Storage Bucket setup
 
--- 1. Create storage bucket for product images if it doesn't exist
+-- 1. Create storage buckets ('Images' and 'product-images') if they don't exist
 insert into storage.buckets (id, name, public)
-values ('product-images', 'product-images', true)
+values ('Images', 'Images', true), ('product-images', 'product-images', true)
 on conflict (id) do update set public = true;
+
+-- Storage policies for Images bucket
+drop policy if exists "Images bucket public select" on storage.objects;
+create policy "Images bucket public select"
+  on storage.objects for select
+  using (bucket_id = 'Images');
+
+drop policy if exists "Images bucket staff insert" on storage.objects;
+create policy "Images bucket staff insert"
+  on storage.objects for insert
+  with check (bucket_id = 'Images' and auth.role() = 'authenticated');
+
+drop policy if exists "Images bucket staff update" on storage.objects;
+create policy "Images bucket staff update"
+  on storage.objects for update
+  using (bucket_id = 'Images' and auth.role() = 'authenticated');
 
 -- Storage policies for product-images bucket
 drop policy if exists "Product images public select" on storage.objects;
