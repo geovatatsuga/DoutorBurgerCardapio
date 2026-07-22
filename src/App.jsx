@@ -2828,6 +2828,34 @@ function FlowDrawer({
               ))}
             </div>
 
+            {checkoutPayment === "Pix" && (
+              <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", padding: "14px", borderRadius: "14px", marginTop: "10px" }}>
+                <strong style={{ color: "#166534", fontSize: "13px", display: "block", marginBottom: "4px" }}>
+                  ⚡ Pagamento via Chave PIX
+                </strong>
+                <p style={{ fontSize: "12px", color: "#15803d", margin: "0 0 10px 0" }}>
+                  Copie a chave PIX abaixo para pagar no app do seu banco:
+                </p>
+                <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                  <code style={{ flex: 1, background: "#ffffff", padding: "8px 12px", borderRadius: "8px", border: "1px solid #bbf7d0", fontSize: "12px", fontWeight: "700", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {storeSettings.phone ? storeSettings.phone.replace(/\D/g, "") : "83987654321"}
+                  </code>
+                  <button
+                    type="button"
+                    className="primary-btn"
+                    style={{ padding: "8px 14px", fontSize: "12px", background: "#16a34a" }}
+                    onClick={() => {
+                      const key = storeSettings.phone ? storeSettings.phone.replace(/\D/g, "") : "83987654321";
+                      navigator.clipboard.writeText(key);
+                      alert("Chave PIX copiada para a área de transferência!");
+                    }}
+                  >
+                    📋 Copiar PIX
+                  </button>
+                </div>
+              </div>
+            )}
+
             {checkoutPayment === "Dinheiro" && (
               <div style={{ animation: "fadeIn 0.3s ease", marginTop: "10px" }}>
                 <label className="field" style={{ margin: 0 }}>
