@@ -1913,7 +1913,7 @@ _Pedido enviado via Cardápio Digital!_`;
   return (
     <>
       <div className="app-shell">
-        <Header count={count} onHome={() => setView("home")} onCart={() => setView("cart")} onDelivery={() => setFlow("delivery")} isStoreOpen={isStoreOpen} />
+        <Header count={count} onHome={() => setView("home")} onCart={() => setView("cart")} onDelivery={() => setFlow("delivery")} isStoreOpen={isStoreOpen} storeSettings={storeSettings} selectedDeliveryZone={selectedDeliveryZone} />
         <main className="customer-grid">
           {/* Closed notice block - compact */}
           {!isStoreOpen && (
@@ -1928,7 +1928,10 @@ _Pedido enviado via Cardápio Digital!_`;
               categories={categoryNames}
               filteredProducts={filteredProducts}
               products={products}
-            search={search}
+              storeSettings={storeSettings}
+              currentFee={currentFee}
+              currentMinOrder={currentMinOrder}
+              search={search}
             setActiveCategory={setActiveCategory}
             setSearch={setSearch}
             openProduct={openProduct}
@@ -2016,17 +2019,18 @@ _Pedido enviado via Cardápio Digital!_`;
   );
 }
 
-function Header({ count, onHome, onCart, onDelivery, isStoreOpen }) {
+function Header({ count, onHome, onCart, onDelivery, isStoreOpen, storeSettings, selectedDeliveryZone }) {
+  const locationLabel = selectedDeliveryZone?.name || storeSettings.address?.split("-")[0]?.trim() || "Area de entrega";
   return (
     <header className="topbar">
-      <a className="brand" href="#inicio" aria-label="Doutor Burger inicio" onClick={(event) => { event.preventDefault(); onHome(); }}>
+      <a className="brand" href="#inicio" aria-label={`${storeSettings.name} inicio`} onClick={(event) => { event.preventDefault(); onHome(); }}>
         <span className="brand-mark"><img src="/assets/brand/logo.png" alt="Doutor Burger Logo" width="64" height="64" decoding="async" /></span>
-        <span><strong>Doutor Burger</strong><small>Cura sua fome</small></span>
+        <span><strong>{storeSettings.name}</strong><small>Cura sua fome</small></span>
       </a>
       <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
         <button className="location-pill" onClick={onDelivery}>
           <Icon name="pin" />
-          <span>Auto do Mateus</span>
+          <span>{locationLabel}</span>
         </button>
         <span style={{
           background: isStoreOpen ? "#ecf8e8" : "#fee3e3",
@@ -2048,11 +2052,11 @@ function Header({ count, onHome, onCart, onDelivery, isStoreOpen }) {
   );
 }
 
-function Catalog({ activeCategory, categories, filteredProducts, products, search, setActiveCategory, setSearch, openProduct, addQuick, isStoreOpen }) {
+function Catalog({ activeCategory, categories, filteredProducts, products, storeSettings, isStoreOpen, currentFee, currentMinOrder, search, setActiveCategory, setSearch, openProduct, addQuick }) {
   const comboProducts = products.filter((product) => product.active && product.category === "Combos");
   return (
     <section className="catalog" id="inicio">
-      <Hero />
+      <Hero storeSettings={storeSettings} isStoreOpen={isStoreOpen} currentFee={currentFee} currentMinOrder={currentMinOrder} />
       <Combos products={comboProducts} openProduct={openProduct} isStoreOpen={isStoreOpen} />
       <Favorites products={products} openProduct={openProduct} />
       <section className="section-block" id="cardapio">
@@ -2083,22 +2087,31 @@ function Catalog({ activeCategory, categories, filteredProducts, products, searc
   );
 }
 
-function Hero() {
+function Hero({ storeSettings, isStoreOpen, currentFee, currentMinOrder }) {
+  const storeName = storeSettings.name || "BurgerC";
+  const titleParts = storeName.split(/\s+/);
+  const firstTitle = titleParts[0] || storeName;
+  const secondTitle = titleParts.slice(1).join(" ") || "";
+  const closeLabel = storeSettings.closeHour ? `Ate ${storeSettings.closeHour}` : "Horario configurado";
+  const statusText = isStoreOpen ? "Aberto agora" : "Fechado agora";
+  const feeLabel = currentFee > 0 ? `a partir de ${money.format(currentFee)}` : "gratis";
+  const minOrderLabel = currentMinOrder > 0 ? `Min. ${money.format(currentMinOrder)}` : "Sem minimo";
+
   return (
     <div className="hero">
       <div className="hero-copy">
-        <span className="eyebrow">Aberto agora - Entrega 35-45 min</span>
-        <h1><span>Doutor</span><span>Burger</span></h1>
+        <span className="eyebrow">{statusText} - Entrega {storeSettings.deliveryTime}</span>
+        <h1><span>{firstTitle}</span>{secondTitle && <span>{secondTitle}</span>}</h1>
         <p>Burgers artesanais, combos e batatas para matar sua fome hoje em Joao Pessoa.</p>
         <div className="hero-actions">
           <button className="primary-btn" onClick={() => document.querySelector("#cardapio")?.scrollIntoView({ behavior: "smooth" })}>Ver cardapio</button>
           <a className="hero-link" href="#ofertas">Ver ofertas</a>
         </div>
         <div className="hero-meta">
-          <span><Icon name="clock" /><strong>Aberto agora</strong> Ate 23h</span>
-          <span><Icon name="bike" /><strong>Entrega</strong> 35-45 min</span>
+          <span><Icon name="clock" /><strong>{statusText}</strong> {closeLabel}</span>
+          <span><Icon name="bike" /><strong>Entrega</strong> {storeSettings.deliveryTime}</span>
           <span><Icon name="bag" /><strong>Retirada</strong> 20-30 min</span>
-          <span><Icon name="coin" /><strong>Taxa</strong> a partir de R$ 6,90</span>
+          <span><Icon name="coin" /><strong>Taxa</strong> {feeLabel} - {minOrderLabel}</span>
         </div>
       </div>
       <img src="/assets/new-direction/doutor-burger.webp" alt="Doutor Burger em destaque" width="960" height="960" decoding="async" fetchPriority="high" />
