@@ -75,7 +75,7 @@ const products = [
   },
   {
     id: "batata-rustica",
-    category: "Batatas",
+    category: "Acompanhamentos",
     name: "Batata Rustica",
     description: "Batata crocante 200g com sal da casa.",
     price: 12.9,
@@ -83,7 +83,7 @@ const products = [
   },
   {
     id: "batata-cheddar",
-    category: "Batatas",
+    category: "Acompanhamentos",
     name: "Batata Cheddar Bacon",
     description: "Batata com cheddar cremoso e bacon.",
     price: 19.9,
@@ -107,7 +107,7 @@ const products = [
   },
 ];
 
-const categories = ["Burgers", "Combos", "Batatas", "Bebidas", "Sobremesas"];
+const categories = ["Burgers", "Combos", "Acompanhamentos", "Bebidas", "Sobremesas"];
 const deliveryFee = 6.9;
 let activeCategory = "Burgers";
 let selectedProduct = products[0];

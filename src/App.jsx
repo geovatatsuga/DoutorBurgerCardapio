@@ -92,11 +92,11 @@ function checkStoreOpen(settings) {
   }
 }
 
-const categories = ["Burgers", "Combos", "Batatas", "Bebidas", "Sobremesas"];
+const categories = ["Burgers", "Combos", "Acompanhamentos", "Bebidas", "Sobremesas"];
 const categoryIcons = {
   Burgers: "burger",
   Combos: "combo",
-  Batatas: "fries",
+  Acompanhamentos: "fries",
   Bebidas: "drink",
   Sobremesas: "cake",
 };
