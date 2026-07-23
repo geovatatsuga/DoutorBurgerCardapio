@@ -2335,35 +2335,31 @@ function Favorites({ products, openProduct }) {
 }
 
 function ProductRow({ product, openProduct, addQuick, isStoreOpen }) {
-  const hasPresetTags = Boolean(productCardTags[product.name]);
   const descriptionItems = productCardTags[product.name] || product.description
     .split(",")
     .map((item) => item.trim().replace(/\.$/, ""))
     .filter(Boolean);
-  const visibleIngredients = hasPresetTags ? descriptionItems : descriptionItems.slice(0, 3);
-  const remainingIngredients = hasPresetTags ? 0 : descriptionItems.length - visibleIngredients.length;
 
   return (
     <article className="product-card" onClick={() => openProduct(product.id)} style={{ cursor: "pointer" }}>
       <img src={product.image} alt={product.name} width="960" height="960" loading="lazy" decoding="async" />
-      <div>
+      <div className="product-card-body">
         <h3>{product.name}</h3>
-        <ul className="product-ingredients" aria-label="Principais ingredientes">
-          {visibleIngredients.map((item) => <li key={item}>{item}</li>)}
-          {remainingIngredients > 0 && <li className="more-ingredients">+{remainingIngredients} ingredientes</li>}
+        <ul className="product-ingredients" aria-label="Ingredientes do burger">
+          {descriptionItems.map((item) => <li key={item}>{item}</li>)}
         </ul>
+        <div className="product-card-footer">
+          <div className="product-price-box">
+            {product.originalPrice && product.originalPrice > product.price && (
+              <span className="original-price">{money.format(product.originalPrice)}</span>
+            )}
+            <strong>{money.format(product.price)}</strong>
+          </div>
+          {isStoreOpen && (
+            <button className="round-btn" onClick={(event) => { event.stopPropagation(); openProduct(product.id); }} aria-label={`Ver e personalizar ${product.name}`}>+</button>
+          )}
+        </div>
       </div>
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
-        {product.originalPrice && product.originalPrice > product.price && (
-          <span style={{ fontSize: "12px", color: "#999", textDecoration: "line-through", fontWeight: "600" }}>
-            {money.format(product.originalPrice)}
-          </span>
-        )}
-        <strong>{money.format(product.price)}</strong>
-      </div>
-      {isStoreOpen && (
-        <button className="round-btn" onClick={(event) => { event.stopPropagation(); addQuick(product.id); }} aria-label={`Adicionar ${product.name} ao carrinho`}>+</button>
-      )}
     </article>
   );
 }
