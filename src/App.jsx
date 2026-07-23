@@ -716,7 +716,12 @@ export default function App() {
       )
     );
     const semIngredientsText = removedIngredients.length > 0 ? `Sem: ${removedIngredients.join(", ")}` : "";
-    const comboDetailsText = isCombo ? `Burger: ${comboBurger} | Bebida: ${comboDrink} | Acomp: ${comboSide}` : "";
+    const extrasText = extras.length > 0 ? `Adicionais: ${extras.map((item) => item.name).join(", ")}` : "";
+
+    const comboDetailsText = isCombo
+      ? `Burger: ${comboBurger} (Ponto: ${meat}${semIngredientsText ? " | " + semIngredientsText : ""}${extrasText ? " | " + extrasText : ""}) | Acomp: ${comboSide} | Bebida: ${comboDrink}`
+      : "";
+
     const uniqueKey = Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
     setCart((items) => [
       ...items,
@@ -727,13 +732,14 @@ export default function App() {
         image: selectedProduct.image,
         price: detailUnitPrice,
         qty: detailQty,
-        notes: [
-          comboDetailsText,
-          semIngredientsText,
-          (isBurger || isCombo) ? `Ponto: ${meat}` : "",
-          ...extras.map((item) => item.name),
-          note.trim()
-        ].filter(Boolean).join(" + "),
+        notes: isCombo
+          ? [comboDetailsText, note.trim()].filter(Boolean).join(" + ")
+          : [
+              semIngredientsText,
+              isBurger ? `Ponto: ${meat}` : "",
+              ...extras.map((item) => item.name),
+              note.trim()
+            ].filter(Boolean).join(" + "),
       },
     ]);
     setView("cart");
@@ -1557,6 +1563,11 @@ _Pedido enviado via Cardápio Digital!_`;
                       </select>
                     </label>
                   </div>
+                  {productFormCategory === "Combos" && (
+                    <div style={{ marginTop: "14px", background: "#fff8ec", border: "1px solid #ffe1ad", borderRadius: "14px", padding: "14px 18px", color: "#8a5800", fontSize: "13px", lineHeight: "1.4" }}>
+                      <strong>⚡ Fila de Seleção Automática do Combo Ativada:</strong> Os clientes poderão escolher o Hambúrguer (com miniaturas), customizar ingredientes e ponto da carne do burger individualmente, e escolher o acompanhamento e a bebida em 4 etapas guiadas.
+                    </div>
+                  )}
                   <label className="field" style={{ marginTop: "12px" }}>Descrição / Ingredientes
                     <textarea value={productFormDesc} onChange={(e) => setProductFormDesc(e.target.value)} style={{ width: "100%", minHeight: "80px", borderRadius: "16px", padding: "12px", border: "1px solid var(--line)" }} />
                   </label>
@@ -2627,9 +2638,32 @@ function ProductDetail({
 
               {isCombo && (
                 <>
+                  <div className="combo-step-indicator" style={{ display: "flex", gap: "8px", marginBottom: "20px", background: "#fff8ec", padding: "12px 16px", borderRadius: "14px", border: "1px solid #ffe1ad", overflowX: "auto" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", fontWeight: "800", color: "#ee8500", whiteSpace: "nowrap" }}>
+                      <span style={{ background: "#ee8500", color: "#fff", width: "20px", height: "20px", borderRadius: "50%", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "11px" }}>1</span>
+                      <span>Hambúrguer</span>
+                    </div>
+                    <span style={{ color: "#d8be9a" }}>→</span>
+                    <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", fontWeight: "800", color: "#ee8500", whiteSpace: "nowrap" }}>
+                      <span style={{ background: "#ee8500", color: "#fff", width: "20px", height: "20px", borderRadius: "50%", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "11px" }}>2</span>
+                      <span>Customizar Burger</span>
+                    </div>
+                    <span style={{ color: "#d8be9a" }}>→</span>
+                    <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", fontWeight: "800", color: "#ee8500", whiteSpace: "nowrap" }}>
+                      <span style={{ background: "#ee8500", color: "#fff", width: "20px", height: "20px", borderRadius: "50%", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "11px" }}>3</span>
+                      <span>Acompanhamento</span>
+                    </div>
+                    <span style={{ color: "#d8be9a" }}>→</span>
+                    <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", fontWeight: "800", color: "#ee8500", whiteSpace: "nowrap" }}>
+                      <span style={{ background: "#ee8500", color: "#fff", width: "20px", height: "20px", borderRadius: "50%", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "11px" }}>4</span>
+                      <span>Bebida</span>
+                    </div>
+                  </div>
+
+                  {/* Passo 1: Escolha do Burger */}
                   <div className="detail-section combo-burger-section">
                     <div className="detail-section-title">
-                      <h3>Escolha o Hambúrguer do Combo</h3>
+                      <h3>Passo 1: Escolha o Hambúrguer do Combo</h3>
                       <p>Selecione o burger principal do seu combo.</p>
                     </div>
                     <div className="meat-options" style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
@@ -2650,7 +2684,7 @@ function ProductDetail({
                           Duplo: "/assets/products/duplo-burgerc.webp",
                         }[b.name] || "/assets/new-direction/doutor-burger.webp";
                         return (
-                          <label key={b.id || b.name} className={isSelected ? "is-selected" : ""} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", borderRadius: "14px", width: "100%", boxSizing: "border-box", gap: "12px" }}>
+                          <label key={b.id || b.name} className={isSelected ? "is-selected" : ""} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", borderRadius: "14px", width: "100%", boxSizing: "border-box", gap: "12px", cursor: "pointer" }}>
                             <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
                               <input name="comboBurger" type="radio" checked={isSelected} onChange={() => setComboBurger(b.name)} />
                               <img
@@ -2670,27 +2704,64 @@ function ProductDetail({
                     </div>
                   </div>
 
-                  <div className="detail-section combo-drink-section">
-                    <div className="detail-section-title">
-                      <h3>Escolha a Bebida do Combo</h3>
-                      <p>Incluso no seu combo.</p>
+                  {/* Passo 2: Customização Individual do Burger Selecionado */}
+                  <div className="detail-section combo-customization-box" style={{ background: "#fafafa", padding: "16px", borderRadius: "16px", border: "1px solid var(--line)", marginBottom: "20px" }}>
+                    <div className="detail-section-title" style={{ marginBottom: "14px" }}>
+                      <h3 style={{ color: "#ee8500" }}>Passo 2: Customizar {comboBurger}</h3>
+                      <p>Escolha o ponto da carne, ingredientes para remover e adicionais exclusivos do seu burger <strong>{comboBurger}</strong>.</p>
                     </div>
-                    <div className="meat-options">
-                      {drinkOptions.map((drink) => {
-                        const isSelected = comboDrink === drink;
-                        return (
-                          <label key={drink} className={isSelected ? "is-selected" : ""}>
-                            <input name="comboDrink" type="radio" checked={isSelected} onChange={() => setComboDrink(drink)} />
-                            {drink}
-                          </label>
-                        );
-                      })}
+
+                    <div style={{ marginBottom: "16px" }}>
+                      <strong style={{ display: "block", fontSize: "13px", marginBottom: "6px", color: "var(--text)" }}>Ponto da carne do {comboBurger}:</strong>
+                      <div className="meat-options">
+                        {["Ao ponto", "Bem passado", "Mal passado"].map((mode) => {
+                          const isSelected = meat === mode;
+                          return (
+                            <label key={mode} className={isSelected ? "is-selected" : ""}>
+                              <input name="meat" type="radio" checked={isSelected} onChange={() => setMeat(mode)} />
+                              {mode}
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div style={{ marginBottom: "16px" }}>
+                      <strong style={{ display: "block", fontSize: "13px", marginBottom: "6px", color: "var(--text)" }}>Remover ingredientes do {comboBurger}:</strong>
+                      <div className="option-grid compact-options">
+                        {removableItems.map((ing) => {
+                          const isRemoved = removedIngredients.includes(ing);
+                          return (
+                            <label key={ing} className={isRemoved ? "is-removed" : ""}>
+                              <input type="checkbox" checked={isRemoved} onChange={() => toggleRemovedIngredient(ing)} />
+                              <span>{ing}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div>
+                      <strong style={{ display: "block", fontSize: "13px", marginBottom: "6px", color: "var(--text)" }}>Adicionais no {comboBurger}:</strong>
+                      <div className="option-grid extras-grid">
+                        {comboExtraOptions.map(([name, price]) => {
+                          const isSelected = extras.some((item) => item.name === name);
+                          return (
+                            <label className={`check-row ${isSelected ? "is-selected" : ""}`} key={name}>
+                              <input type="checkbox" checked={isSelected} onChange={() => toggleExtra(name, price)} />
+                              <span>{name}</span>
+                              <strong>+ {money.format(price)}</strong>
+                            </label>
+                          );
+                        })}
+                      </div>
                     </div>
                   </div>
 
+                  {/* Passo 3: Acompanhamento */}
                   <div className="detail-section combo-side-section">
                     <div className="detail-section-title">
-                      <h3>Escolha o Acompanhamento</h3>
+                      <h3>Passo 3: Escolha o Acompanhamento</h3>
                       <p>Acompanhamento incluso no seu combo.</p>
                     </div>
                     <div className="meat-options">
@@ -2705,76 +2776,93 @@ function ProductDetail({
                       })}
                     </div>
                   </div>
+
+                  {/* Passo 4: Bebida */}
+                  <div className="detail-section combo-drink-section">
+                    <div className="detail-section-title">
+                      <h3>Passo 4: Escolha a Bebida do Combo</h3>
+                      <p>Refrigerante / bebida inclusa no seu combo.</p>
+                    </div>
+                    <div className="meat-options">
+                      {drinkOptions.map((drink) => {
+                        const isSelected = comboDrink === drink;
+                        return (
+                          <label key={drink} className={isSelected ? "is-selected" : ""}>
+                            <input name="comboDrink" type="radio" checked={isSelected} onChange={() => setComboDrink(drink)} />
+                            {drink}
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </>
               )}
 
-              {(isBurger || isCombo) && (
-                <div className="detail-section meat-choice">
-                  <div className="detail-section-title">
-                    <h3>Ponto da carne do hambúrguer</h3>
-                    <p>Escolha como prefere o burger.</p>
-                  </div>
-                  <div className="meat-options">
-                    {["Ao ponto", "Bem passado", "Mal passado"].map((mode) => {
-                      const isSelected = meat === mode;
-                      return (
-                        <label key={mode} className={isSelected ? "is-selected" : ""}>
-                          <input name="meat" type="radio" checked={isSelected} onChange={() => setMeat(mode)} />
-                          {mode}
-                        </label>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {(isBurger || isCombo) && (
-                <div className="detail-section removal-section">
-                  <div className="detail-section-title">
-                    <h3>Remover ingredientes</h3>
-                    <p>Marque apenas o que você quer tirar do pedido.</p>
-                  </div>
-                  <div className="option-grid compact-options">
-                    {removableItems.map((ing) => {
-                      const isRemoved = removedIngredients.includes(ing);
-                      return (
-                        <label key={ing} className={isRemoved ? "is-removed" : ""}>
-                          <input type="checkbox" checked={isRemoved} onChange={() => toggleRemovedIngredient(ing)} />
-                          <span>{ing}</span>
-                        </label>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {extraOptions.length > 0 && (
-                <div className="detail-section extras-section">
-                  <div className="detail-section-title">
-                    <h3>{isBurger ? "Adicionais do Hambúrguer" : isCombo ? "Adicionais no Combo" : "Adicionais"}</h3>
-                    <p>{isBurger ? "Selecione ingredientes adicionais específicos para o seu burger." : "Complete com extras selecionados."}</p>
-                  </div>
-                  <div className="option-grid extras-grid">
-                    {extraOptions.map(([name, price]) => {
-                      const isSelected = extras.some((item) => item.name === name);
-                      return (
-                        <label className={`check-row ${isSelected ? "is-selected" : ""}`} key={name}>
-                          <input type="checkbox" checked={isSelected} onChange={() => toggleExtra(name, price)} />
-                          <span>{name}</span>
-                          <strong>{price > 0 ? `+ ${money.format(price)}` : "Grátis"}</strong>
-                        </label>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
               {isBurger && (
-                <label className={`combo-row detail-combo-card ${combo ? "is-selected" : ""}`}>
-                  <input type="checkbox" checked={combo} onChange={(event) => setCombo(event.target.checked)} />
-                  <span><strong>Transformar em Combo (Batata + Bebida)</strong><small>Adiciona batata crocante e refrigerante lata 350ml</small></span>
-                  <strong>+ R$ 11,90</strong>
-                </label>
+                <>
+                  <div className="detail-section meat-choice">
+                    <div className="detail-section-title">
+                      <h3>Ponto da carne do hambúrguer</h3>
+                      <p>Escolha como prefere o burger.</p>
+                    </div>
+                    <div className="meat-options">
+                      {["Ao ponto", "Bem passado", "Mal passado"].map((mode) => {
+                        const isSelected = meat === mode;
+                        return (
+                          <label key={mode} className={isSelected ? "is-selected" : ""}>
+                            <input name="meat" type="radio" checked={isSelected} onChange={() => setMeat(mode)} />
+                            {mode}
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="detail-section removal-section">
+                    <div className="detail-section-title">
+                      <h3>Remover ingredientes</h3>
+                      <p>Marque apenas o que você quer tirar do pedido.</p>
+                    </div>
+                    <div className="option-grid compact-options">
+                      {removableItems.map((ing) => {
+                        const isRemoved = removedIngredients.includes(ing);
+                        return (
+                          <label key={ing} className={isRemoved ? "is-removed" : ""}>
+                            <input type="checkbox" checked={isRemoved} onChange={() => toggleRemovedIngredient(ing)} />
+                            <span>{ing}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {extraOptions.length > 0 && (
+                    <div className="detail-section extras-section">
+                      <div className="detail-section-title">
+                        <h3>Adicionais do Hambúrguer</h3>
+                        <p>Selecione ingredientes adicionais específicos para o seu burger.</p>
+                      </div>
+                      <div className="option-grid extras-grid">
+                        {extraOptions.map(([name, price]) => {
+                          const isSelected = extras.some((item) => item.name === name);
+                          return (
+                            <label className={`check-row ${isSelected ? "is-selected" : ""}`} key={name}>
+                              <input type="checkbox" checked={isSelected} onChange={() => toggleExtra(name, price)} />
+                              <span>{name}</span>
+                              <strong>{price > 0 ? `+ ${money.format(price)}` : "Grátis"}</strong>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  <label className={`combo-row detail-combo-card ${combo ? "is-selected" : ""}`}>
+                    <input type="checkbox" checked={combo} onChange={(event) => setCombo(event.target.checked)} />
+                    <span><strong>Transformar em Combo (Batata + Bebida)</strong><small>Adiciona batata crocante e refrigerante lata 350ml</small></span>
+                    <strong>+ R$ 11,90</strong>
+                  </label>
+                </>
               )}
 
               <label className="note-box"><span>Observações</span><textarea value={note} onChange={(event) => setNote(event.target.value)} maxLength={120} placeholder="Ex.: sem cebola, molho à parte..." /></label>
