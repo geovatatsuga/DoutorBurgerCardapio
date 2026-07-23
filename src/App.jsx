@@ -287,6 +287,7 @@ export default function App() {
   const [combo, setCombo] = useState(false);
   const [comboDrink, setComboDrink] = useState("Coca-Cola 350ml");
   const [comboSide, setComboSide] = useState("Batata Frita Crocante");
+  const [comboBurger, setComboBurger] = useState("X-Salada");
   const [note, setNote] = useState("");
   const [receiveMode, setReceiveMode] = useState("Entrega");
   const [flow, setFlow] = useState(null);
@@ -642,10 +643,13 @@ export default function App() {
   const count = cart.reduce((sum, item) => sum + item.qty, 0);
   const isBurger = selectedProduct?.category === "Burgers";
   const isCombo = selectedProduct?.category === "Combos";
+  const burgerProducts = useMemo(() => products.filter((p) => p.category === "Burgers" && p.active !== false), [products]);
+  const selectedComboBurgerObj = burgerProducts.find((b) => b.name === comboBurger);
+  const comboBurgerExtraPrice = (isCombo && selectedComboBurgerObj) ? (selectedComboBurgerObj.name === "Duplo" ? 8 : selectedComboBurgerObj.name === "Agridoce" ? 4 : 0) : 0;
   const comboSidePrice = (isCombo && comboSide.includes("Onion Rings")) ? 3 : 0;
   const comboPrice = isBurger && combo ? 11.9 : 0;
   const extrasTotal = extras.reduce((sum, item) => sum + item.price, 0);
-  const detailUnitPrice = selectedProduct ? (selectedProduct.price + extrasTotal + comboPrice + comboSidePrice) : 0;
+  const detailUnitPrice = selectedProduct ? (selectedProduct.price + extrasTotal + comboPrice + comboSidePrice + comboBurgerExtraPrice) : 0;
 
   const filteredProducts = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -667,6 +671,7 @@ export default function App() {
     setCombo(false);
     setComboDrink("Coca-Cola 350ml");
     setComboSide("Batata Frita Crocante");
+    setComboBurger("X-Salada");
     setNote("");
     setFlow(null);
     setView("detail");
@@ -689,7 +694,7 @@ export default function App() {
     const isBurger = selectedProduct?.category === "Burgers";
     const isCombo = selectedProduct?.category === "Combos";
     const semIngredientsText = removedIngredients.length > 0 ? `Sem: ${removedIngredients.join(", ")}` : "";
-    const comboDetailsText = isCombo ? `Bebida: ${comboDrink} | Acomp: ${comboSide}` : "";
+    const comboDetailsText = isCombo ? `Burger: ${comboBurger} | Bebida: ${comboDrink} | Acomp: ${comboSide}` : "";
     const uniqueKey = Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
     setCart((items) => [
       ...items,
@@ -2097,6 +2102,9 @@ _Pedido enviado via Cardápio Digital!_`;
           setComboDrink={setComboDrink}
           comboSide={comboSide}
           setComboSide={setComboSide}
+          comboBurger={comboBurger}
+          setComboBurger={setComboBurger}
+          burgerProducts={burgerProducts}
           note={note}
           setNote={setNote}
           unitPrice={detailUnitPrice}
@@ -2432,6 +2440,9 @@ function ProductDetail({
   setComboDrink,
   comboSide,
   setComboSide,
+  comboBurger,
+  setComboBurger,
+  burgerProducts,
   note,
   setNote,
   unitPrice,
@@ -2508,29 +2519,8 @@ function ProductDetail({
     : ["Cebola", "Tomate", "Picles", "Salada fresca"];
 
   const galleryImages = useMemo(() => {
-    if (!product) return [];
-    if (product.category === "Bebidas") {
-      return [product.image];
-    }
-    if (product.id === "doutor") {
-      return [
-        "/assets/new-direction/doutor-burger.webp",
-        "/assets/new-direction/combo-doutor.webp",
-        "/assets/new-direction/smash-cheddar.webp",
-      ];
-    } else if (product.id === "smash") {
-      return [
-        "/assets/new-direction/smash-cheddar.webp",
-        "/assets/new-direction/combo-doutor.webp",
-        "/assets/new-direction/doutor-burger.webp",
-      ];
-    } else {
-      return [
-        product.image,
-        "/assets/new-direction/combo-doutor.webp",
-        "/assets/new-direction/doutor-burger.webp",
-      ];
-    }
+    if (!product || !product.image) return [];
+    return [product.image];
   }, [product]);
 
   const [activeImgIndex, setActiveImgIndex] = useState(0);
@@ -2557,6 +2547,8 @@ function ProductDetail({
 
   const extrasTotal = extras.reduce((sum, item) => sum + item.price, 0);
   const comboSidePrice = (isCombo && comboSide.includes("Onion Rings")) ? 3 : 0;
+  const selectedComboBurgerObj = (burgerProducts || []).find((b) => b.name === comboBurger);
+  const comboBurgerExtraPrice = (isCombo && selectedComboBurgerObj) ? (selectedComboBurgerObj.name === "Duplo" ? 8 : selectedComboBurgerObj.name === "Agridoce" ? 4 : 0) : 0;
   const comboPrice = isBurger && combo ? 11.9 : 0;
 
   return (
@@ -2579,17 +2571,19 @@ function ProductDetail({
                 </>
               )}
               <img className="detail-image" src={galleryImages[activeImgIndex] || product.image} alt={product.name} width="960" height="960" decoding="async" fetchPriority="high" />
-              <div className="detail-thumbs">
-                {galleryImages.map((img, idx) => (
-                  <img
-                    key={idx}
-                    className={idx === activeImgIndex ? "is-active" : ""}
-                    src={img}
-                    alt={`${product.name} thumbnail ${idx}`}
-                    onClick={() => setActiveImgIndex(idx)}
-                  />
-                ))}
-              </div>
+              {galleryImages.length > 1 && (
+                <div className="detail-thumbs">
+                  {galleryImages.map((img, idx) => (
+                    <img
+                      key={idx}
+                      className={idx === activeImgIndex ? "is-active" : ""}
+                      src={img}
+                      alt={`${product.name} thumbnail ${idx}`}
+                      onClick={() => setActiveImgIndex(idx)}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
             <div className="detail-copy">
               <div className="detail-head">
@@ -2599,6 +2593,37 @@ function ProductDetail({
 
               {isCombo && (
                 <>
+                  <div className="detail-section combo-burger-section">
+                    <div className="detail-section-title">
+                      <h3>Escolha o Hambúrguer do Combo</h3>
+                      <p>Selecione o burger principal do seu combo.</p>
+                    </div>
+                    <div className="meat-options" style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                      {(burgerProducts?.length ? burgerProducts : [
+                        { id: "x-salada", name: "X-Salada", description: "Carne 90g, queijo prato e salada fresca", extraPrice: 0 },
+                        { id: "cheeseburger", name: "Cheeseburger", description: "Carne 90g e cheddar derretido", extraPrice: 0 },
+                        { id: "x-bacon", name: "X-Bacon", description: "Carne 90g, cheddar e bacon crocante", extraPrice: 0 },
+                        { id: "agridoce", name: "Agridoce", description: "Carne 90g, queijo coalho e abacaxi", extraPrice: 4 },
+                        { id: "duplo", name: "Duplo", description: "2 carnes 90g, duplo cheddar e bacon", extraPrice: 8 },
+                      ]).map((b) => {
+                        const isSelected = comboBurger === b.name;
+                        const extraCost = b.name === "Duplo" ? 8 : b.name === "Agridoce" ? 4 : 0;
+                        return (
+                          <label key={b.id || b.name} className={isSelected ? "is-selected" : ""} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 14px", borderRadius: "12px", width: "100%", boxSizing: "border-box" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                              <input name="comboBurger" type="radio" checked={isSelected} onChange={() => setComboBurger(b.name)} />
+                              <div style={{ textAlign: "left" }}>
+                                <strong style={{ fontSize: "15px", display: "block" }}>{b.name}</strong>
+                                <small style={{ display: "block", color: "#68717d", fontSize: "12px", marginTop: "2px" }}>{b.description}</small>
+                              </div>
+                            </div>
+                            {extraCost > 0 && <span style={{ fontWeight: 800, color: "#ee8500", fontSize: "13px", whiteSpace: "nowrap" }}>+ {money.format(extraCost)}</span>}
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+
                   <div className="detail-section combo-drink-section">
                     <div className="detail-section-title">
                       <h3>Escolha a Bebida do Combo</h3>
@@ -2711,6 +2736,7 @@ function ProductDetail({
                 <h3>Resumo do pedido</h3>
                 <div><span>Subtotal</span><strong>{money.format(product.price)}</strong></div>
                 {extrasTotal > 0 && <div><span>Extras</span><strong>{money.format(extrasTotal)}</strong></div>}
+                {comboBurgerExtraPrice > 0 && <div><span>Opção Hambúrguer ({comboBurger})</span><strong>{money.format(comboBurgerExtraPrice)}</strong></div>}
                 {comboSidePrice > 0 && <div><span>Opção Acompanhamento</span><strong>{money.format(comboSidePrice)}</strong></div>}
                 {comboPrice > 0 && <div><span>Combo (Batata + Bebida)</span><strong>{money.format(comboPrice)}</strong></div>}
                 <div className="detail-order-total"><span>Total</span><strong>{money.format(unitPrice * qty)}</strong></div>
