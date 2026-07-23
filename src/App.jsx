@@ -285,9 +285,19 @@ export default function App() {
   const [removedIngredients, setRemovedIngredients] = useState([]);
   const [meat, setMeat] = useState("Ao ponto");
   const [combo, setCombo] = useState(false);
-  const [comboDrink, setComboDrink] = useState("Coca-Cola 350ml");
-  const [comboSide, setComboSide] = useState("Batata Frita Crocante");
   const [comboBurger, setComboBurger] = useState("X-Salada");
+  const [comboBurger2, setComboBurger2] = useState("Cheeseburger");
+  const [meat2, setMeat2] = useState("Ao ponto");
+  const [removedIngredients2, setRemovedIngredients2] = useState([]);
+  const [extras2, setExtras2] = useState([]);
+
+  const toggleExtra2 = (name, price) => {
+    setExtras2((prev) =>
+      prev.some((item) => item.name === name)
+        ? prev.filter((item) => item.name !== name)
+        : [...prev, { name, price }]
+    );
+  };
   const [note, setNote] = useState("");
   const [receiveMode, setReceiveMode] = useState("Entrega");
   const [flow, setFlow] = useState(null);
@@ -648,6 +658,18 @@ export default function App() {
       (selectedProduct.name && selectedProduct.name.toLowerCase().includes("combo"))
     )
   );
+  const isMultiBurgerCombo = Boolean(
+    isCombo && selectedProduct && (
+      selectedProduct.name.toLowerCase().includes("dupla") ||
+      selectedProduct.name.toLowerCase().includes("duplo") ||
+      selectedProduct.name.toLowerCase().includes("galera") ||
+      (selectedProduct.description && (
+        selectedProduct.description.toLowerCase().includes("2 hambúrgueres") ||
+        selectedProduct.description.toLowerCase().includes("2 burgers") ||
+        selectedProduct.description.toLowerCase().includes("2 lanches")
+      ))
+    )
+  );
   const isBurger = Boolean(
     selectedProduct && !isCombo && (
       selectedProduct.category === "Burgers" ||
@@ -655,11 +677,16 @@ export default function App() {
     )
   );
   const burgerProducts = useMemo(() => products.filter((p) => (p.category === "Burgers" || !p.name.toLowerCase().includes("combo")) && p.category !== "Bebidas" && p.category !== "Acompanhamentos" && p.category !== "Sobremesas" && p.active !== false), [products]);
-  const selectedComboBurgerObj = burgerProducts.find((b) => b.name === comboBurger);
-  const comboBurgerExtraPrice = (isCombo && selectedComboBurgerObj) ? (selectedComboBurgerObj.name === "Duplo" ? 8 : selectedComboBurgerObj.name === "Agridoce" ? 4 : 0) : 0;
+  const selectedComboBurgerObj1 = burgerProducts.find((b) => b.name === comboBurger);
+  const selectedComboBurgerObj2 = isMultiBurgerCombo ? burgerProducts.find((b) => b.name === comboBurger2) : null;
+  const comboBurgerExtraPrice1 = (isCombo && selectedComboBurgerObj1) ? (selectedComboBurgerObj1.name === "Duplo" ? 8 : selectedComboBurgerObj1.name === "Agridoce" ? 4 : 0) : 0;
+  const comboBurgerExtraPrice2 = (isMultiBurgerCombo && selectedComboBurgerObj2) ? (selectedComboBurgerObj2.name === "Duplo" ? 8 : selectedComboBurgerObj2.name === "Agridoce" ? 4 : 0) : 0;
+  const comboBurgerExtraPrice = comboBurgerExtraPrice1 + comboBurgerExtraPrice2;
   const comboSidePrice = (isCombo && (comboSide.includes("Onion Rings") || comboSide.includes("Nuggets"))) ? 3 : 0;
   const comboPrice = isBurger && combo ? 11.9 : 0;
-  const extrasTotal = extras.reduce((sum, item) => sum + item.price, 0);
+  const extrasTotal1 = extras.reduce((sum, item) => sum + item.price, 0);
+  const extrasTotal2 = isMultiBurgerCombo ? extras2.reduce((sum, item) => sum + item.price, 0) : 0;
+  const extrasTotal = extrasTotal1 + extrasTotal2;
   const detailUnitPrice = selectedProduct ? (selectedProduct.price + extrasTotal + comboPrice + comboSidePrice + comboBurgerExtraPrice) : 0;
 
   const filteredProducts = useMemo(() => {
@@ -679,10 +706,14 @@ export default function App() {
     setExtras(product.id === "doutor" ? [{ name: "Bacon crocante em tiras", price: 4 }] : []);
     setRemovedIngredients([]);
     setMeat("Ao ponto");
+    setExtras2([]);
+    setRemovedIngredients2([]);
+    setMeat2("Ao ponto");
     setCombo(false);
     setComboDrink("Coca-Cola 350ml");
     setComboSide("Batata Frita Crocante");
     setComboBurger("X-Salada");
+    setComboBurger2("Cheeseburger");
     setNote("");
     setFlow(null);
     setView("detail");
@@ -709,17 +740,37 @@ export default function App() {
         (selectedProduct.name && selectedProduct.name.toLowerCase().includes("combo"))
       )
     );
+    const isMultiBurgerCombo = Boolean(
+      isCombo && selectedProduct && (
+        selectedProduct.name.toLowerCase().includes("dupla") ||
+        selectedProduct.name.toLowerCase().includes("duplo") ||
+        selectedProduct.name.toLowerCase().includes("galera") ||
+        (selectedProduct.description && (
+          selectedProduct.description.toLowerCase().includes("2 hambúrgueres") ||
+          selectedProduct.description.toLowerCase().includes("2 burgers") ||
+          selectedProduct.description.toLowerCase().includes("2 lanches")
+        ))
+      )
+    );
     const isBurger = Boolean(
       selectedProduct && !isCombo && (
         selectedProduct.category === "Burgers" ||
         (selectedProduct.name && !selectedProduct.name.toLowerCase().includes("combo"))
       )
     );
-    const semIngredientsText = removedIngredients.length > 0 ? `Sem: ${removedIngredients.join(", ")}` : "";
-    const extrasText = extras.length > 0 ? `Adicionais: ${extras.map((item) => item.name).join(", ")}` : "";
+
+    const semIngredientsText1 = removedIngredients.length > 0 ? `Sem: ${removedIngredients.join(", ")}` : "";
+    const extrasText1 = extras.length > 0 ? `Adicionais: ${extras.map((item) => item.name).join(", ")}` : "";
+    const burger1Details = `${comboBurger} (Ponto: ${meat}${semIngredientsText1 ? " | " + semIngredientsText1 : ""}${extrasText1 ? " | " + extrasText1 : ""})`;
+
+    const semIngredientsText2 = removedIngredients2.length > 0 ? `Sem: ${removedIngredients2.join(", ")}` : "";
+    const extrasText2 = extras2.length > 0 ? `Adicionais: ${extras2.map((item) => item.name).join(", ")}` : "";
+    const burger2Details = isMultiBurgerCombo ? `${comboBurger2} (Ponto: ${meat2}${semIngredientsText2 ? " | " + semIngredientsText2 : ""}${extrasText2 ? " | " + extrasText2 : ""})` : "";
 
     const comboDetailsText = isCombo
-      ? `Burger: ${comboBurger} (Ponto: ${meat}${semIngredientsText ? " | " + semIngredientsText : ""}${extrasText ? " | " + extrasText : ""}) | Acomp: ${comboSide} | Bebida: ${comboDrink}`
+      ? isMultiBurgerCombo
+        ? `1º Burger: ${burger1Details} | 2º Burger: ${burger2Details} | Acomp: ${comboSide} | Bebida: ${comboDrink}`
+        : `Burger: ${burger1Details} | Acomp: ${comboSide} | Bebida: ${comboDrink}`
       : "";
 
     const uniqueKey = Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
@@ -2471,6 +2522,15 @@ function ProductDetail({
   setComboSide,
   comboBurger,
   setComboBurger,
+  isMultiBurgerCombo,
+  comboBurger2,
+  setComboBurger2,
+  meat2,
+  setMeat2,
+  removedIngredients2,
+  setRemovedIngredients2,
+  extras2,
+  toggleExtra2,
   burgerProducts,
   note,
   setNote,
@@ -2586,6 +2646,12 @@ function ProductDetail({
     );
   };
 
+  const toggleRemovedIngredient2 = (name) => {
+    setRemovedIngredients2((prev) =>
+      prev.includes(name) ? prev.filter((item) => item !== name) : [...prev, name]
+    );
+  };
+
   const extrasTotal = extras.reduce((sum, item) => sum + item.price, 0);
   const comboSidePrice = (isCombo && comboSide.includes("Onion Rings")) ? 3 : 0;
   const selectedComboBurgerObj = (burgerProducts || []).find((b) => b.name === comboBurger);
@@ -2634,33 +2700,59 @@ function ProductDetail({
 
               {isCombo && (
                 <>
-                  <div className="combo-step-indicator" style={{ display: "flex", gap: "8px", marginBottom: "20px", background: "#fff8ec", padding: "12px 16px", borderRadius: "14px", border: "1px solid #ffe1ad", overflowX: "auto" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", fontWeight: "800", color: "#ee8500", whiteSpace: "nowrap" }}>
-                      <span style={{ background: "#ee8500", color: "#fff", width: "20px", height: "20px", borderRadius: "50%", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "11px" }}>1</span>
-                      <span>Hambúrguer</span>
-                    </div>
-                    <span style={{ color: "#d8be9a" }}>→</span>
-                    <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", fontWeight: "800", color: "#ee8500", whiteSpace: "nowrap" }}>
-                      <span style={{ background: "#ee8500", color: "#fff", width: "20px", height: "20px", borderRadius: "50%", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "11px" }}>2</span>
-                      <span>Customizar Burger</span>
-                    </div>
-                    <span style={{ color: "#d8be9a" }}>→</span>
-                    <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", fontWeight: "800", color: "#ee8500", whiteSpace: "nowrap" }}>
-                      <span style={{ background: "#ee8500", color: "#fff", width: "20px", height: "20px", borderRadius: "50%", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "11px" }}>3</span>
-                      <span>Acompanhamento</span>
-                    </div>
-                    <span style={{ color: "#d8be9a" }}>→</span>
-                    <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", fontWeight: "800", color: "#ee8500", whiteSpace: "nowrap" }}>
-                      <span style={{ background: "#ee8500", color: "#fff", width: "20px", height: "20px", borderRadius: "50%", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "11px" }}>4</span>
-                      <span>Bebida</span>
-                    </div>
+                  <div className="combo-step-indicator" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "6px", marginBottom: "20px", background: "#fff8ec", padding: "10px 14px", borderRadius: "14px", border: "1px solid #ffe1ad" }}>
+                    {isMultiBurgerCombo ? (
+                      <>
+                        <div style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "11px", fontWeight: "800", color: "#ee8500" }}>
+                          <span style={{ background: "#ee8500", color: "#fff", width: "18px", height: "18px", borderRadius: "50%", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "10px" }}>1</span>
+                          <span>1º Burger</span>
+                        </div>
+                        <span style={{ color: "#d8be9a" }}>→</span>
+                        <div style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "11px", fontWeight: "800", color: "#ee8500" }}>
+                          <span style={{ background: "#ee8500", color: "#fff", width: "18px", height: "18px", borderRadius: "50%", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "10px" }}>2</span>
+                          <span>2º Burger</span>
+                        </div>
+                        <span style={{ color: "#d8be9a" }}>→</span>
+                        <div style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "11px", fontWeight: "800", color: "#ee8500" }}>
+                          <span style={{ background: "#ee8500", color: "#fff", width: "18px", height: "18px", borderRadius: "50%", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "10px" }}>3</span>
+                          <span>Acompanhamento</span>
+                        </div>
+                        <span style={{ color: "#d8be9a" }}>→</span>
+                        <div style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "11px", fontWeight: "800", color: "#ee8500" }}>
+                          <span style={{ background: "#ee8500", color: "#fff", width: "18px", height: "18px", borderRadius: "50%", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "10px" }}>4</span>
+                          <span>Bebida</span>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "11px", fontWeight: "800", color: "#ee8500" }}>
+                          <span style={{ background: "#ee8500", color: "#fff", width: "18px", height: "18px", borderRadius: "50%", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "10px" }}>1</span>
+                          <span>Hambúrguer</span>
+                        </div>
+                        <span style={{ color: "#d8be9a" }}>→</span>
+                        <div style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "11px", fontWeight: "800", color: "#ee8500" }}>
+                          <span style={{ background: "#ee8500", color: "#fff", width: "18px", height: "18px", borderRadius: "50%", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "10px" }}>2</span>
+                          <span>Customizar</span>
+                        </div>
+                        <span style={{ color: "#d8be9a" }}>→</span>
+                        <div style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "11px", fontWeight: "800", color: "#ee8500" }}>
+                          <span style={{ background: "#ee8500", color: "#fff", width: "18px", height: "18px", borderRadius: "50%", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "10px" }}>3</span>
+                          <span>Acompanhamento</span>
+                        </div>
+                        <span style={{ color: "#d8be9a" }}>→</span>
+                        <div style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "11px", fontWeight: "800", color: "#ee8500" }}>
+                          <span style={{ background: "#ee8500", color: "#fff", width: "18px", height: "18px", borderRadius: "50%", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "10px" }}>4</span>
+                          <span>Bebida</span>
+                        </div>
+                      </>
+                    )}
                   </div>
 
-                  {/* Passo 1: Escolha do Burger */}
+                  {/* Passo 1: Escolha do 1º Burger */}
                   <div className="detail-section combo-burger-section">
                     <div className="detail-section-title">
-                      <h3>Passo 1: Escolha o Hambúrguer do Combo</h3>
-                      <p>Selecione o burger principal do seu combo.</p>
+                      <h3>Passo 1: {isMultiBurgerCombo ? "Escolha o 1º Hambúrguer do Combo" : "Escolha o Hambúrguer do Combo"}</h3>
+                      <p>Selecione o {isMultiBurgerCombo ? "primeiro" : "principal"} burger do seu combo.</p>
                     </div>
                     <div className="meat-options" style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                       {(burgerProducts?.length ? burgerProducts : [
@@ -2700,11 +2792,11 @@ function ProductDetail({
                     </div>
                   </div>
 
-                  {/* Passo 2: Customização Individual do Burger Selecionado */}
+                  {/* Passo 1.1 Customização do 1º Burger */}
                   <div className="detail-section combo-customization-box" style={{ background: "#fafafa", padding: "16px", borderRadius: "16px", border: "1px solid var(--line)", marginBottom: "20px" }}>
                     <div className="detail-section-title" style={{ marginBottom: "14px" }}>
-                      <h3 style={{ color: "#ee8500" }}>Passo 2: Customizar {comboBurger}</h3>
-                      <p>Escolha o ponto da carne, ingredientes para remover e adicionais exclusivos do seu burger <strong>{comboBurger}</strong>.</p>
+                      <h3 style={{ color: "#ee8500" }}>{isMultiBurgerCombo ? "Customizar 1º Burger" : "Passo 2: Customizar"} ({comboBurger})</h3>
+                      <p>Ponto da carne, remoção de ingredientes e adicionais para <strong>{comboBurger}</strong>.</p>
                     </div>
 
                     <div style={{ marginBottom: "16px" }}>
@@ -2754,10 +2846,112 @@ function ProductDetail({
                     </div>
                   </div>
 
-                  {/* Passo 3: Acompanhamento */}
+                  {/* Se o combo tiver 2 hambúrgueres: Passo 2: Escolha e Customização do 2º Burger */}
+                  {isMultiBurgerCombo && (
+                    <>
+                      <div className="detail-section combo-burger-section-2" style={{ borderTop: "2px dashed #ffe1ad", paddingTop: "20px" }}>
+                        <div className="detail-section-title">
+                          <h3 style={{ color: "#d97706" }}>Passo 2: Escolha o 2º Hambúrguer do Combo</h3>
+                          <p>Selecione o segundo burger do seu combo.</p>
+                        </div>
+                        <div className="meat-options" style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                          {(burgerProducts?.length ? burgerProducts : [
+                            { id: "x-salada", name: "X-Salada", description: "Carne 90g, queijo prato e salada fresca", image: "/assets/products/x-salada-burgerc.webp", extraPrice: 0 },
+                            { id: "cheeseburger", name: "Cheeseburger", description: "Carne 90g e cheddar derretido", image: "/assets/products/cheeseburger-burgerc.webp", extraPrice: 0 },
+                            { id: "x-bacon", name: "X-Bacon", description: "Carne 90g, cheddar e bacon crocante", image: "/assets/products/x-bacon-burgerc.webp", extraPrice: 0 },
+                            { id: "agridoce", name: "Agridoce", description: "Carne 90g, queijo coalho e abacaxi", image: "/assets/products/agridoce-burgerc.webp", extraPrice: 4 },
+                            { id: "duplo", name: "Duplo", description: "2 carnes 90g, duplo cheddar e bacon", image: "/assets/products/duplo-burgerc.webp", extraPrice: 8 },
+                          ]).map((b) => {
+                            const isSelected = comboBurger2 === b.name;
+                            const extraCost = b.name === "Duplo" ? 8 : b.name === "Agridoce" ? 4 : 0;
+                            const burgerImg = b.image || {
+                              "X-Salada": "/assets/products/x-salada-burgerc.webp",
+                              Cheeseburger: "/assets/products/cheeseburger-burgerc.webp",
+                              "X-Bacon": "/assets/products/x-bacon-burgerc.webp",
+                              Agridoce: "/assets/products/agridoce-burgerc.webp",
+                              Duplo: "/assets/products/duplo-burgerc.webp",
+                            }[b.name] || "/assets/new-direction/doutor-burger.webp";
+                            return (
+                              <label key={`b2-${b.id || b.name}`} className={isSelected ? "is-selected" : ""} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", borderRadius: "14px", width: "100%", boxSizing: "border-box", gap: "12px", cursor: "pointer" }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                                  <input name="comboBurger2" type="radio" checked={isSelected} onChange={() => setComboBurger2(b.name)} />
+                                  <img
+                                    src={burgerImg}
+                                    alt={b.name}
+                                    style={{ width: "48px", height: "48px", borderRadius: "10px", objectFit: "cover", flexShrink: 0, border: "1px solid var(--line)" }}
+                                  />
+                                  <div style={{ textAlign: "left" }}>
+                                    <strong style={{ fontSize: "15px", display: "block" }}>{b.name}</strong>
+                                    <small style={{ display: "block", color: "#68717d", fontSize: "12px", marginTop: "2px", lineHeight: "1.25" }}>{b.description}</small>
+                                  </div>
+                                </div>
+                                {extraCost > 0 && <span style={{ fontWeight: 800, color: "#ee8500", fontSize: "13px", whiteSpace: "nowrap" }}>+ {money.format(extraCost)}</span>}
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Customização do 2º Burger */}
+                      <div className="detail-section combo-customization-box-2" style={{ background: "#fffdf9", padding: "16px", borderRadius: "16px", border: "1px solid #ffe1ad", marginBottom: "20px" }}>
+                        <div className="detail-section-title" style={{ marginBottom: "14px" }}>
+                          <h3 style={{ color: "#d97706" }}>Customizar 2º Burger ({comboBurger2})</h3>
+                          <p>Ponto da carne, remoção de ingredientes e adicionais para <strong>{comboBurger2}</strong>.</p>
+                        </div>
+
+                        <div style={{ marginBottom: "16px" }}>
+                          <strong style={{ display: "block", fontSize: "13px", marginBottom: "6px", color: "var(--text)" }}>Ponto da carne do {comboBurger2}:</strong>
+                          <div className="meat-options">
+                            {["Ao ponto", "Bem passado", "Mal passado"].map((mode) => {
+                              const isSelected = meat2 === mode;
+                              return (
+                                <label key={`m2-${mode}`} className={isSelected ? "is-selected" : ""}>
+                                  <input name="meat2" type="radio" checked={isSelected} onChange={() => setMeat2(mode)} />
+                                  {mode}
+                                </label>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        <div style={{ marginBottom: "16px" }}>
+                          <strong style={{ display: "block", fontSize: "13px", marginBottom: "6px", color: "var(--text)" }}>Remover ingredientes do {comboBurger2}:</strong>
+                          <div className="option-grid compact-options">
+                            {removableItems.map((ing) => {
+                              const isRemoved = removedIngredients2.includes(ing);
+                              return (
+                                <label key={`rem2-${ing}`} className={isRemoved ? "is-removed" : ""}>
+                                  <input type="checkbox" checked={isRemoved} onChange={() => toggleRemovedIngredient2(ing)} />
+                                  <span>{ing}</span>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        <div>
+                          <strong style={{ display: "block", fontSize: "13px", marginBottom: "6px", color: "var(--text)" }}>Adicionais no {comboBurger2}:</strong>
+                          <div className="option-grid extras-grid">
+                            {comboExtraOptions.map(([name, price]) => {
+                              const isSelected = extras2.some((item) => item.name === name);
+                              return (
+                                <label className={`check-row ${isSelected ? "is-selected" : ""}`} key={`ex2-${name}`}>
+                                  <input type="checkbox" checked={isSelected} onChange={() => toggleExtra2(name, price)} />
+                                  <span>{name}</span>
+                                  <strong>+ {money.format(price)}</strong>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  )}
+
+                  {/* Passo Acompanhamento */}
                   <div className="detail-section combo-side-section">
                     <div className="detail-section-title">
-                      <h3>Passo 3: Escolha o Acompanhamento</h3>
+                      <h3>Passo {isMultiBurgerCombo ? "3" : "3"}: Escolha o Acompanhamento</h3>
                       <p>Acompanhamento incluso no seu combo.</p>
                     </div>
                     <div className="meat-options">
@@ -2773,10 +2967,10 @@ function ProductDetail({
                     </div>
                   </div>
 
-                  {/* Passo 4: Bebida */}
+                  {/* Passo Bebida */}
                   <div className="detail-section combo-drink-section">
                     <div className="detail-section-title">
-                      <h3>Passo 4: Escolha a Bebida do Combo</h3>
+                      <h3>Passo {isMultiBurgerCombo ? "4" : "4"}: Escolha a Bebida do Combo</h3>
                       <p>Refrigerante / bebida inclusa no seu combo.</p>
                     </div>
                     <div className="meat-options">
