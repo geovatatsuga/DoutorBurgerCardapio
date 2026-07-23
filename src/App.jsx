@@ -2634,21 +2634,33 @@ function ProductDetail({
                     </div>
                     <div className="meat-options" style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                       {(burgerProducts?.length ? burgerProducts : [
-                        { id: "x-salada", name: "X-Salada", description: "Carne 90g, queijo prato e salada fresca", extraPrice: 0 },
-                        { id: "cheeseburger", name: "Cheeseburger", description: "Carne 90g e cheddar derretido", extraPrice: 0 },
-                        { id: "x-bacon", name: "X-Bacon", description: "Carne 90g, cheddar e bacon crocante", extraPrice: 0 },
-                        { id: "agridoce", name: "Agridoce", description: "Carne 90g, queijo coalho e abacaxi", extraPrice: 4 },
-                        { id: "duplo", name: "Duplo", description: "2 carnes 90g, duplo cheddar e bacon", extraPrice: 8 },
+                        { id: "x-salada", name: "X-Salada", description: "Carne 90g, queijo prato e salada fresca", image: "/assets/products/x-salada-burgerc.webp", extraPrice: 0 },
+                        { id: "cheeseburger", name: "Cheeseburger", description: "Carne 90g e cheddar derretido", image: "/assets/products/cheeseburger-burgerc.webp", extraPrice: 0 },
+                        { id: "x-bacon", name: "X-Bacon", description: "Carne 90g, cheddar e bacon crocante", image: "/assets/products/x-bacon-burgerc.webp", extraPrice: 0 },
+                        { id: "agridoce", name: "Agridoce", description: "Carne 90g, queijo coalho e abacaxi", image: "/assets/products/agridoce-burgerc.webp", extraPrice: 4 },
+                        { id: "duplo", name: "Duplo", description: "2 carnes 90g, duplo cheddar e bacon", image: "/assets/products/duplo-burgerc.webp", extraPrice: 8 },
                       ]).map((b) => {
                         const isSelected = comboBurger === b.name;
                         const extraCost = b.name === "Duplo" ? 8 : b.name === "Agridoce" ? 4 : 0;
+                        const burgerImg = b.image || {
+                          "X-Salada": "/assets/products/x-salada-burgerc.webp",
+                          Cheeseburger: "/assets/products/cheeseburger-burgerc.webp",
+                          "X-Bacon": "/assets/products/x-bacon-burgerc.webp",
+                          Agridoce: "/assets/products/agridoce-burgerc.webp",
+                          Duplo: "/assets/products/duplo-burgerc.webp",
+                        }[b.name] || "/assets/new-direction/doutor-burger.webp";
                         return (
-                          <label key={b.id || b.name} className={isSelected ? "is-selected" : ""} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 14px", borderRadius: "12px", width: "100%", boxSizing: "border-box" }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                          <label key={b.id || b.name} className={isSelected ? "is-selected" : ""} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", borderRadius: "14px", width: "100%", boxSizing: "border-box", gap: "12px" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
                               <input name="comboBurger" type="radio" checked={isSelected} onChange={() => setComboBurger(b.name)} />
+                              <img
+                                src={burgerImg}
+                                alt={b.name}
+                                style={{ width: "48px", height: "48px", borderRadius: "10px", objectFit: "cover", flexShrink: 0, border: "1px solid var(--line)" }}
+                              />
                               <div style={{ textAlign: "left" }}>
                                 <strong style={{ fontSize: "15px", display: "block" }}>{b.name}</strong>
-                                <small style={{ display: "block", color: "#68717d", fontSize: "12px", marginTop: "2px" }}>{b.description}</small>
+                                <small style={{ display: "block", color: "#68717d", fontSize: "12px", marginTop: "2px", lineHeight: "1.25" }}>{b.description}</small>
                               </div>
                             </div>
                             {extraCost > 0 && <span style={{ fontWeight: 800, color: "#ee8500", fontSize: "13px", whiteSpace: "nowrap" }}>+ {money.format(extraCost)}</span>}
