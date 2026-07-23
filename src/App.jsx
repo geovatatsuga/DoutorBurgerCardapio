@@ -285,6 +285,8 @@ export default function App() {
   const [removedIngredients, setRemovedIngredients] = useState([]);
   const [meat, setMeat] = useState("Ao ponto");
   const [combo, setCombo] = useState(false);
+  const [comboDrink, setComboDrink] = useState("Coca-Cola 350ml");
+  const [comboSide, setComboSide] = useState("Batata Frita Crocante");
   const [comboBurger, setComboBurger] = useState("X-Salada");
   const [comboBurger2, setComboBurger2] = useState("Cheeseburger");
   const [meat2, setMeat2] = useState("Ao ponto");
