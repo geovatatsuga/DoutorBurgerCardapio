@@ -712,8 +712,8 @@ export default function App() {
     setCombo(false);
     setComboDrink("Coca-Cola 350ml");
     setComboSide("Batata Frita Crocante");
-    setComboBurger("X-Salada");
-    setComboBurger2("Cheeseburger");
+    setComboBurger("");
+    setComboBurger2("");
     setNote("");
     setFlow(null);
     setView("detail");
@@ -752,6 +752,18 @@ export default function App() {
         ))
       )
     );
+
+    if (isCombo) {
+      if (isMultiBurgerCombo && (!comboBurger || !comboBurger2)) {
+        alert("Por favor, selecione ambos os hambúrgueres para completar o combo antes de adicionar ao carrinho.");
+        return;
+      }
+      if (!isMultiBurgerCombo && !comboBurger) {
+        alert("Por favor, selecione o hambúrguer do combo antes de adicionar ao carrinho.");
+        return;
+      }
+    }
+
     const isBurger = Boolean(
       selectedProduct && !isCombo && (
         selectedProduct.category === "Burgers" ||
@@ -2750,9 +2762,20 @@ function ProductDetail({
 
                   {/* Passo 1: Escolha do 1º Burger */}
                   <div className="detail-section combo-burger-section">
-                    <div className="detail-section-title">
-                      <h3>Passo 1: {isMultiBurgerCombo ? "Escolha o 1º Hambúrguer do Combo" : "Escolha o Hambúrguer do Combo"}</h3>
-                      <p>Selecione o {isMultiBurgerCombo ? "primeiro" : "principal"} burger do seu combo.</p>
+                    <div className="detail-section-title" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "8px" }}>
+                      <div>
+                        <h3>Passo 1: {isMultiBurgerCombo ? "Escolha o 1º Hambúrguer do Combo" : "Escolha o Hambúrguer do Combo"}</h3>
+                        <p>Selecione o {isMultiBurgerCombo ? "primeiro" : "principal"} burger do seu combo.</p>
+                      </div>
+                      {comboBurger ? (
+                        <span style={{ background: "#e6f4ea", color: "#137333", border: "1px solid #ceebe1", padding: "4px 10px", borderRadius: "12px", fontSize: "12px", fontWeight: "800", whiteSpace: "nowrap" }}>
+                          ✓ {comboBurger} Selecionado
+                        </span>
+                      ) : (
+                        <span style={{ background: "#fef7e0", color: "#b06000", border: "1px solid #fce8b2", padding: "4px 10px", borderRadius: "12px", fontSize: "12px", fontWeight: "800", whiteSpace: "nowrap" }}>
+                          ⚠️ Seleção Obrigatória
+                        </span>
+                      )}
                     </div>
                     <div className="meat-options" style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                       {(burgerProducts?.length ? burgerProducts : [
@@ -2850,9 +2873,20 @@ function ProductDetail({
                   {isMultiBurgerCombo && (
                     <>
                       <div className="detail-section combo-burger-section-2" style={{ borderTop: "2px dashed #ffe1ad", paddingTop: "20px" }}>
-                        <div className="detail-section-title">
-                          <h3 style={{ color: "#d97706" }}>Passo 2: Escolha o 2º Hambúrguer do Combo</h3>
-                          <p>Selecione o segundo burger do seu combo.</p>
+                        <div className="detail-section-title" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "8px" }}>
+                          <div>
+                            <h3 style={{ color: "#d97706" }}>Passo 2: Escolha o 2º Hambúrguer do Combo</h3>
+                            <p>Selecione o segundo burger do seu combo.</p>
+                          </div>
+                          {comboBurger2 ? (
+                            <span style={{ background: "#e6f4ea", color: "#137333", border: "1px solid #ceebe1", padding: "4px 10px", borderRadius: "12px", fontSize: "12px", fontWeight: "800", whiteSpace: "nowrap" }}>
+                              ✓ {comboBurger2} Selecionado
+                            </span>
+                          ) : (
+                            <span style={{ background: "#fef7e0", color: "#b06000", border: "1px solid #fce8b2", padding: "4px 10px", borderRadius: "12px", fontSize: "12px", fontWeight: "800", whiteSpace: "nowrap" }}>
+                              ⚠️ Seleção Obrigatória
+                            </span>
+                          )}
                         </div>
                         <div className="meat-options" style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                           {(burgerProducts?.length ? burgerProducts : [
@@ -3068,12 +3102,56 @@ function ProductDetail({
                   <span>Quantidade</span>
                   <div className="stepper"><button onClick={() => setQty(Math.max(1, qty - 1))}>-</button><strong>{qty}</strong><button onClick={() => setQty(qty + 1)}>+</button></div>
                 </div>
-                <button className="primary-btn full" onClick={onAdd}><Icon name="cart" /> Adicionar ao carrinho</button>
-                <small>Compra segura e pedido preparado com carinho.</small>
+                {(() => {
+                  const isSelectionComplete = isCombo
+                    ? (isMultiBurgerCombo ? Boolean(comboBurger && comboBurger2) : Boolean(comboBurger))
+                    : true;
+                  const buttonLabel = !isSelectionComplete
+                    ? (isMultiBurgerCombo && (!comboBurger && !comboBurger2)
+                        ? "Selecione os 2 Hambúrgueres do Combo"
+                        : !comboBurger
+                        ? "Selecione o 1º Hambúrguer"
+                        : "Selecione o 2º Hambúrguer")
+                    : `Adicionar ao carrinho - ${money.format(unitPrice * qty)}`;
+                  return (
+                    <>
+                      <button
+                        className={`primary-btn full ${!isSelectionComplete ? "is-disabled" : ""}`}
+                        onClick={onAdd}
+                        disabled={!isSelectionComplete}
+                        style={!isSelectionComplete ? { opacity: 0.65, cursor: "not-allowed", background: "#949494", borderColor: "#7a7a7a" } : {}}
+                      >
+                        <Icon name="cart" /> {buttonLabel}
+                      </button>
+                      <small>{!isSelectionComplete ? "⚠️ Escolha todos os hambúrgueres para liberar a inclusão no carrinho." : "Compra segura e pedido preparado com carinho."}</small>
+                    </>
+                  );
+                })()}
               </aside>
               <div className="purchase-bar">
                 <div className="qty-row"><div className="stepper"><button aria-label="Diminuir quantidade" onClick={() => setQty(Math.max(1, qty - 1))}>-</button><strong>{qty}</strong><button aria-label="Aumentar quantidade" onClick={() => setQty(qty + 1)}>+</button></div></div>
-                <button className="primary-btn full" onClick={onAdd}><Icon name="cart" /> Adicionar ao carrinho - {money.format(unitPrice * qty)}</button>
+                {(() => {
+                  const isSelectionComplete = isCombo
+                    ? (isMultiBurgerCombo ? Boolean(comboBurger && comboBurger2) : Boolean(comboBurger))
+                    : true;
+                  const buttonLabel = !isSelectionComplete
+                    ? (isMultiBurgerCombo && (!comboBurger && !comboBurger2)
+                        ? "Selecione os 2 Hambúrgueres"
+                        : !comboBurger
+                        ? "Selecione o 1º Hambúrguer"
+                        : "Selecione o 2º Hambúrguer")
+                    : `Adicionar ao carrinho - ${money.format(unitPrice * qty)}`;
+                  return (
+                    <button
+                      className={`primary-btn full ${!isSelectionComplete ? "is-disabled" : ""}`}
+                      onClick={onAdd}
+                      disabled={!isSelectionComplete}
+                      style={!isSelectionComplete ? { opacity: 0.65, cursor: "not-allowed", background: "#949494", borderColor: "#7a7a7a" } : {}}
+                    >
+                      <Icon name="cart" /> {buttonLabel}
+                    </button>
+                  );
+                })()}
               </div>
             </div>
           </>
