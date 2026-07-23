@@ -641,12 +641,23 @@ export default function App() {
   const currentFee = receiveMode === "Entrega" ? currentDeliveryFee : 0;
   const total = subtotal ? subtotal + currentFee : 0;
   const count = cart.reduce((sum, item) => sum + item.qty, 0);
-  const isBurger = selectedProduct?.category === "Burgers";
-  const isCombo = selectedProduct?.category === "Combos";
-  const burgerProducts = useMemo(() => products.filter((p) => p.category === "Burgers" && p.active !== false), [products]);
+  const isCombo = Boolean(
+    selectedProduct && (
+      selectedProduct.category === "Combos" ||
+      (selectedProduct.category && selectedProduct.category.toLowerCase().includes("combo")) ||
+      (selectedProduct.name && selectedProduct.name.toLowerCase().includes("combo"))
+    )
+  );
+  const isBurger = Boolean(
+    selectedProduct && !isCombo && (
+      selectedProduct.category === "Burgers" ||
+      (selectedProduct.name && !selectedProduct.name.toLowerCase().includes("combo"))
+    )
+  );
+  const burgerProducts = useMemo(() => products.filter((p) => (p.category === "Burgers" || !p.name.toLowerCase().includes("combo")) && p.category !== "Bebidas" && p.category !== "Acompanhamentos" && p.category !== "Sobremesas" && p.active !== false), [products]);
   const selectedComboBurgerObj = burgerProducts.find((b) => b.name === comboBurger);
   const comboBurgerExtraPrice = (isCombo && selectedComboBurgerObj) ? (selectedComboBurgerObj.name === "Duplo" ? 8 : selectedComboBurgerObj.name === "Agridoce" ? 4 : 0) : 0;
-  const comboSidePrice = (isCombo && comboSide.includes("Onion Rings")) ? 3 : 0;
+  const comboSidePrice = (isCombo && (comboSide.includes("Onion Rings") || comboSide.includes("Nuggets"))) ? 3 : 0;
   const comboPrice = isBurger && combo ? 11.9 : 0;
   const extrasTotal = extras.reduce((sum, item) => sum + item.price, 0);
   const detailUnitPrice = selectedProduct ? (selectedProduct.price + extrasTotal + comboPrice + comboSidePrice + comboBurgerExtraPrice) : 0;
@@ -691,8 +702,19 @@ export default function App() {
       setView("home");
       return;
     }
-    const isBurger = selectedProduct?.category === "Burgers";
-    const isCombo = selectedProduct?.category === "Combos";
+    const isCombo = Boolean(
+      selectedProduct && (
+        selectedProduct.category === "Combos" ||
+        (selectedProduct.category && selectedProduct.category.toLowerCase().includes("combo")) ||
+        (selectedProduct.name && selectedProduct.name.toLowerCase().includes("combo"))
+      )
+    );
+    const isBurger = Boolean(
+      selectedProduct && !isCombo && (
+        selectedProduct.category === "Burgers" ||
+        (selectedProduct.name && !selectedProduct.name.toLowerCase().includes("combo"))
+      )
+    );
     const semIngredientsText = removedIngredients.length > 0 ? `Sem: ${removedIngredients.join(", ")}` : "";
     const comboDetailsText = isCombo ? `Burger: ${comboBurger} | Bebida: ${comboDrink} | Acomp: ${comboSide}` : "";
     const uniqueKey = Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
@@ -2451,8 +2473,19 @@ function ProductDetail({
   removedIngredients,
   setRemovedIngredients,
 }) {
-  const isBurger = product?.category === "Burgers";
-  const isCombo = product?.category === "Combos";
+  const isCombo = Boolean(
+    product && (
+      product.category === "Combos" ||
+      (product.category && product.category.toLowerCase().includes("combo")) ||
+      (product.name && product.name.toLowerCase().includes("combo"))
+    )
+  );
+  const isBurger = Boolean(
+    product && !isCombo && (
+      product.category === "Burgers" ||
+      (product.category !== "Bebidas" && product.category !== "Acompanhamentos" && product.category !== "Sobremesas")
+    )
+  );
   const isSide = product?.category === "Acompanhamentos";
   const isDrink = product?.category === "Bebidas";
   const isDessert = product?.category === "Sobremesas";
@@ -2512,6 +2545,7 @@ function ProductDetail({
     "Batata Frita Crocante",
     "Batata Rústica",
     "Onion Rings (+ R$ 3,00)",
+    "Nuggets 6 un (+ R$ 3,00)",
   ];
 
   const removableItems = isCombo
