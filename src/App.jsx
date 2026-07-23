@@ -665,10 +665,13 @@ export default function App() {
       selectedProduct.name.toLowerCase().includes("dupla") ||
       selectedProduct.name.toLowerCase().includes("duplo") ||
       selectedProduct.name.toLowerCase().includes("galera") ||
+      selectedProduct.name.toLowerCase().includes("casal") ||
+      selectedProduct.name.toLowerCase().includes("2") ||
       (selectedProduct.description && (
-        selectedProduct.description.toLowerCase().includes("2 hambúrgueres") ||
-        selectedProduct.description.toLowerCase().includes("2 burgers") ||
-        selectedProduct.description.toLowerCase().includes("2 lanches")
+        selectedProduct.description.toLowerCase().includes("2 hamb") ||
+        selectedProduct.description.toLowerCase().includes("2 burg") ||
+        selectedProduct.description.toLowerCase().includes("2 lanch") ||
+        selectedProduct.description.toLowerCase().includes("dois hamb")
       ))
     )
   );
@@ -747,10 +750,13 @@ export default function App() {
         selectedProduct.name.toLowerCase().includes("dupla") ||
         selectedProduct.name.toLowerCase().includes("duplo") ||
         selectedProduct.name.toLowerCase().includes("galera") ||
+        selectedProduct.name.toLowerCase().includes("casal") ||
+        selectedProduct.name.toLowerCase().includes("2") ||
         (selectedProduct.description && (
-          selectedProduct.description.toLowerCase().includes("2 hambúrgueres") ||
-          selectedProduct.description.toLowerCase().includes("2 burgers") ||
-          selectedProduct.description.toLowerCase().includes("2 lanches")
+          selectedProduct.description.toLowerCase().includes("2 hamb") ||
+          selectedProduct.description.toLowerCase().includes("2 burg") ||
+          selectedProduct.description.toLowerCase().includes("2 lanch") ||
+          selectedProduct.description.toLowerCase().includes("dois hamb")
         ))
       )
     );
@@ -2536,7 +2542,6 @@ function ProductDetail({
   setComboSide,
   comboBurger,
   setComboBurger,
-  isMultiBurgerCombo,
   comboBurger2,
   setComboBurger2,
   meat2,
@@ -2567,9 +2572,29 @@ function ProductDetail({
       (product.category !== "Bebidas" && product.category !== "Acompanhamentos" && product.category !== "Sobremesas")
     )
   );
-  const isSide = product?.category === "Acompanhamentos";
-  const isDrink = product?.category === "Bebidas";
-  const isDessert = product?.category === "Sobremesas";
+  const isMultiBurgerCombo = Boolean(
+    isCombo && (
+      (product?.name && (
+        product.name.toLowerCase().includes("dupla") ||
+        product.name.toLowerCase().includes("duplo") ||
+        product.name.toLowerCase().includes("galera") ||
+        product.name.toLowerCase().includes("casal") ||
+        product.name.toLowerCase().includes("2")
+      )) ||
+      (product?.description && (
+        product.description.toLowerCase().includes("2 hamb") ||
+        product.description.toLowerCase().includes("2 burg") ||
+        product.description.toLowerCase().includes("2 lanch") ||
+        product.description.toLowerCase().includes("dois hamb")
+      ))
+    )
+  );
+
+  const [activeComboTab, setActiveComboTab] = useState(1);
+
+  useEffect(() => {
+    setActiveComboTab(1);
+  }, [product]);
 
   const burgerExtraOptions = [
     ["Blend de carne extra (90g)", 8],
@@ -2714,167 +2739,210 @@ function ProductDetail({
 
               {isCombo && (
                 <>
-                  <div className="combo-step-indicator" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "6px", marginBottom: "20px", background: "#fff8ec", padding: "10px 14px", borderRadius: "14px", border: "1px solid #ffe1ad" }}>
-                    {isMultiBurgerCombo ? (
-                      <>
-                        <div style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "11px", fontWeight: "800", color: "#ee8500" }}>
-                          <span style={{ background: "#ee8500", color: "#fff", width: "18px", height: "18px", borderRadius: "50%", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "10px" }}>1</span>
-                          <span>1º Burger</span>
-                        </div>
-                        <span style={{ color: "#d8be9a" }}>→</span>
-                        <div style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "11px", fontWeight: "800", color: "#ee8500" }}>
-                          <span style={{ background: "#ee8500", color: "#fff", width: "18px", height: "18px", borderRadius: "50%", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "10px" }}>2</span>
-                          <span>2º Burger</span>
-                        </div>
-                        <span style={{ color: "#d8be9a" }}>→</span>
-                        <div style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "11px", fontWeight: "800", color: "#ee8500" }}>
-                          <span style={{ background: "#ee8500", color: "#fff", width: "18px", height: "18px", borderRadius: "50%", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "10px" }}>3</span>
-                          <span>Acompanhamento</span>
-                        </div>
-                        <span style={{ color: "#d8be9a" }}>→</span>
-                        <div style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "11px", fontWeight: "800", color: "#ee8500" }}>
-                          <span style={{ background: "#ee8500", color: "#fff", width: "18px", height: "18px", borderRadius: "50%", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "10px" }}>4</span>
-                          <span>Bebida</span>
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <div style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "11px", fontWeight: "800", color: "#ee8500" }}>
-                          <span style={{ background: "#ee8500", color: "#fff", width: "18px", height: "18px", borderRadius: "50%", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "10px" }}>1</span>
-                          <span>Hambúrguer</span>
-                        </div>
-                        <span style={{ color: "#d8be9a" }}>→</span>
-                        <div style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "11px", fontWeight: "800", color: "#ee8500" }}>
-                          <span style={{ background: "#ee8500", color: "#fff", width: "18px", height: "18px", borderRadius: "50%", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "10px" }}>2</span>
-                          <span>Customizar</span>
-                        </div>
-                        <span style={{ color: "#d8be9a" }}>→</span>
-                        <div style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "11px", fontWeight: "800", color: "#ee8500" }}>
-                          <span style={{ background: "#ee8500", color: "#fff", width: "18px", height: "18px", borderRadius: "50%", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "10px" }}>3</span>
-                          <span>Acompanhamento</span>
-                        </div>
-                        <span style={{ color: "#d8be9a" }}>→</span>
-                        <div style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "11px", fontWeight: "800", color: "#ee8500" }}>
-                          <span style={{ background: "#ee8500", color: "#fff", width: "18px", height: "18px", borderRadius: "50%", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "10px" }}>4</span>
-                          <span>Bebida</span>
-                        </div>
-                      </>
+                  <div className="combo-step-indicator" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "6px", marginBottom: "20px", background: "#fff8ec", padding: "8px 12px", borderRadius: "14px", border: "1px solid #ffe1ad" }}>
+                    <button
+                      type="button"
+                      onClick={() => setActiveComboTab(1)}
+                      style={{
+                        flex: 1,
+                        padding: "8px 10px",
+                        borderRadius: "10px",
+                        border: activeComboTab === 1 ? "2px solid #ee8500" : "1px solid #ffe1ad",
+                        background: activeComboTab === 1 ? "#ee8500" : "#fff",
+                        color: activeComboTab === 1 ? "#fff" : "#ee8500",
+                        fontWeight: "800",
+                        fontSize: "12px",
+                        cursor: "pointer",
+                        whiteSpace: "nowrap"
+                      }}
+                    >
+                      1. 1º Burger {comboBurger ? "✓" : ""}
+                    </button>
+
+                    {isMultiBurgerCombo && (
+                      <button
+                        type="button"
+                        onClick={() => setActiveComboTab(2)}
+                        style={{
+                          flex: 1,
+                          padding: "8px 10px",
+                          borderRadius: "10px",
+                          border: activeComboTab === 2 ? "2px solid #ee8500" : "1px solid #ffe1ad",
+                          background: activeComboTab === 2 ? "#ee8500" : "#fff",
+                          color: activeComboTab === 2 ? "#fff" : "#ee8500",
+                          fontWeight: "800",
+                          fontSize: "12px",
+                          cursor: "pointer",
+                          whiteSpace: "nowrap"
+                        }}
+                      >
+                        2. 2º Burger {comboBurger2 ? "✓" : ""}
+                      </button>
                     )}
+
+                    <button
+                      type="button"
+                      onClick={() => setActiveComboTab(isMultiBurgerCombo ? 3 : 2)}
+                      style={{
+                        flex: 1,
+                        padding: "8px 10px",
+                        borderRadius: "10px",
+                        border: activeComboTab === (isMultiBurgerCombo ? 3 : 2) ? "2px solid #ee8500" : "1px solid #ffe1ad",
+                        background: activeComboTab === (isMultiBurgerCombo ? 3 : 2) ? "#ee8500" : "#fff",
+                        color: activeComboTab === (isMultiBurgerCombo ? 3 : 2) ? "#fff" : "#ee8500",
+                        fontWeight: "800",
+                        fontSize: "12px",
+                        cursor: "pointer",
+                        whiteSpace: "nowrap"
+                      }}
+                    >
+                      {isMultiBurgerCombo ? "3. Batata" : "2. Batata"}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setActiveComboTab(isMultiBurgerCombo ? 4 : 3)}
+                      style={{
+                        flex: 1,
+                        padding: "8px 10px",
+                        borderRadius: "10px",
+                        border: activeComboTab === (isMultiBurgerCombo ? 4 : 3) ? "2px solid #ee8500" : "1px solid #ffe1ad",
+                        background: activeComboTab === (isMultiBurgerCombo ? 4 : 3) ? "#ee8500" : "#fff",
+                        color: activeComboTab === (isMultiBurgerCombo ? 4 : 3) ? "#fff" : "#ee8500",
+                        fontWeight: "800",
+                        fontSize: "12px",
+                        cursor: "pointer",
+                        whiteSpace: "nowrap"
+                      }}
+                    >
+                      {isMultiBurgerCombo ? "4. Bebida" : "3. Bebida"}
+                    </button>
                   </div>
 
-                  {/* Passo 1: Escolha do 1º Burger */}
-                  <div className="detail-section combo-burger-section">
-                    <div className="detail-section-title" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "8px" }}>
-                      <div>
-                        <h3>Passo 1: {isMultiBurgerCombo ? "Escolha o 1º Hambúrguer do Combo" : "Escolha o Hambúrguer do Combo"}</h3>
-                        <p>Selecione o {isMultiBurgerCombo ? "primeiro" : "principal"} burger do seu combo.</p>
+                  {/* ETAPA 1: 1º HAMBÚRGUER */}
+                  {activeComboTab === 1 && (
+                    <div className="combo-step-pane">
+                      <div className="detail-section combo-burger-section">
+                        <div className="detail-section-title" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "8px" }}>
+                          <div>
+                            <h3>Passo 1: {isMultiBurgerCombo ? "Escolha o 1º Hambúrguer do Combo" : "Escolha o Hambúrguer do Combo"}</h3>
+                            <p>Selecione o {isMultiBurgerCombo ? "primeiro" : "principal"} burger do seu combo.</p>
+                          </div>
+                          {comboBurger ? (
+                            <span style={{ background: "#e6f4ea", color: "#137333", border: "1px solid #ceebe1", padding: "4px 10px", borderRadius: "12px", fontSize: "12px", fontWeight: "800", whiteSpace: "nowrap" }}>
+                              ✓ {comboBurger} Selecionado
+                            </span>
+                          ) : (
+                            <span style={{ background: "#fef7e0", color: "#b06000", border: "1px solid #fce8b2", padding: "4px 10px", borderRadius: "12px", fontSize: "12px", fontWeight: "800", whiteSpace: "nowrap" }}>
+                              ⚠️ Seleção Obrigatória
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="meat-options" style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                          {(burgerProducts?.length ? burgerProducts : [
+                            { id: "x-salada", name: "X-Salada", description: "Carne 90g, queijo prato e salada fresca", image: "/assets/products/x-salada-burgerc.webp", extraPrice: 0 },
+                            { id: "cheeseburger", name: "Cheeseburger", description: "Carne 90g e cheddar derretido", image: "/assets/products/cheeseburger-burgerc.webp", extraPrice: 0 },
+                            { id: "x-bacon", name: "X-Bacon", description: "Carne 90g, cheddar e bacon crocante", image: "/assets/products/x-bacon-burgerc.webp", extraPrice: 0 },
+                            { id: "agridoce", name: "Agridoce", description: "Carne 90g, queijo coalho e abacaxi", image: "/assets/products/agridoce-burgerc.webp", extraPrice: 4 },
+                            { id: "duplo", name: "Duplo", description: "2 carnes 90g, duplo cheddar e bacon", image: "/assets/products/duplo-burgerc.webp", extraPrice: 8 },
+                          ]).map((b) => {
+                            const isSelected = comboBurger === b.name;
+                            const extraCost = b.name === "Duplo" ? 8 : b.name === "Agridoce" ? 4 : 0;
+                            const burgerImg = b.image || {
+                              "X-Salada": "/assets/products/x-salada-burgerc.webp",
+                              Cheeseburger: "/assets/products/cheeseburger-burgerc.webp",
+                              "X-Bacon": "/assets/products/x-bacon-burgerc.webp",
+                              Agridoce: "/assets/products/agridoce-burgerc.webp",
+                              Duplo: "/assets/products/duplo-burgerc.webp",
+                            }[b.name] || "/assets/new-direction/doutor-burger.webp";
+                            return (
+                              <label key={b.id || b.name} className={isSelected ? "is-selected" : ""} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", borderRadius: "14px", width: "100%", boxSizing: "border-box", gap: "12px", cursor: "pointer" }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                                  <input name="comboBurger" type="radio" checked={isSelected} onChange={() => setComboBurger(b.name)} />
+                                  <img src={burgerImg} alt={b.name} style={{ width: "48px", height: "48px", borderRadius: "10px", objectFit: "cover", flexShrink: 0, border: "1px solid var(--line)" }} />
+                                  <div style={{ textAlign: "left" }}>
+                                    <strong style={{ fontSize: "15px", display: "block" }}>{b.name}</strong>
+                                    <small style={{ display: "block", color: "#68717d", fontSize: "12px", marginTop: "2px", lineHeight: "1.25" }}>{b.description}</small>
+                                  </div>
+                                </div>
+                                {extraCost > 0 && <span style={{ fontWeight: 800, color: "#ee8500", fontSize: "13px", whiteSpace: "nowrap" }}>+ {money.format(extraCost)}</span>}
+                              </label>
+                            );
+                          })}
+                        </div>
                       </div>
-                      {comboBurger ? (
-                        <span style={{ background: "#e6f4ea", color: "#137333", border: "1px solid #ceebe1", padding: "4px 10px", borderRadius: "12px", fontSize: "12px", fontWeight: "800", whiteSpace: "nowrap" }}>
-                          ✓ {comboBurger} Selecionado
-                        </span>
-                      ) : (
-                        <span style={{ background: "#fef7e0", color: "#b06000", border: "1px solid #fce8b2", padding: "4px 10px", borderRadius: "12px", fontSize: "12px", fontWeight: "800", whiteSpace: "nowrap" }}>
-                          ⚠️ Seleção Obrigatória
-                        </span>
-                      )}
-                    </div>
-                    <div className="meat-options" style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                      {(burgerProducts?.length ? burgerProducts : [
-                        { id: "x-salada", name: "X-Salada", description: "Carne 90g, queijo prato e salada fresca", image: "/assets/products/x-salada-burgerc.webp", extraPrice: 0 },
-                        { id: "cheeseburger", name: "Cheeseburger", description: "Carne 90g e cheddar derretido", image: "/assets/products/cheeseburger-burgerc.webp", extraPrice: 0 },
-                        { id: "x-bacon", name: "X-Bacon", description: "Carne 90g, cheddar e bacon crocante", image: "/assets/products/x-bacon-burgerc.webp", extraPrice: 0 },
-                        { id: "agridoce", name: "Agridoce", description: "Carne 90g, queijo coalho e abacaxi", image: "/assets/products/agridoce-burgerc.webp", extraPrice: 4 },
-                        { id: "duplo", name: "Duplo", description: "2 carnes 90g, duplo cheddar e bacon", image: "/assets/products/duplo-burgerc.webp", extraPrice: 8 },
-                      ]).map((b) => {
-                        const isSelected = comboBurger === b.name;
-                        const extraCost = b.name === "Duplo" ? 8 : b.name === "Agridoce" ? 4 : 0;
-                        const burgerImg = b.image || {
-                          "X-Salada": "/assets/products/x-salada-burgerc.webp",
-                          Cheeseburger: "/assets/products/cheeseburger-burgerc.webp",
-                          "X-Bacon": "/assets/products/x-bacon-burgerc.webp",
-                          Agridoce: "/assets/products/agridoce-burgerc.webp",
-                          Duplo: "/assets/products/duplo-burgerc.webp",
-                        }[b.name] || "/assets/new-direction/doutor-burger.webp";
-                        return (
-                          <label key={b.id || b.name} className={isSelected ? "is-selected" : ""} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", borderRadius: "14px", width: "100%", boxSizing: "border-box", gap: "12px", cursor: "pointer" }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                              <input name="comboBurger" type="radio" checked={isSelected} onChange={() => setComboBurger(b.name)} />
-                              <img
-                                src={burgerImg}
-                                alt={b.name}
-                                style={{ width: "48px", height: "48px", borderRadius: "10px", objectFit: "cover", flexShrink: 0, border: "1px solid var(--line)" }}
-                              />
-                              <div style={{ textAlign: "left" }}>
-                                <strong style={{ fontSize: "15px", display: "block" }}>{b.name}</strong>
-                                <small style={{ display: "block", color: "#68717d", fontSize: "12px", marginTop: "2px", lineHeight: "1.25" }}>{b.description}</small>
-                              </div>
-                            </div>
-                            {extraCost > 0 && <span style={{ fontWeight: 800, color: "#ee8500", fontSize: "13px", whiteSpace: "nowrap" }}>+ {money.format(extraCost)}</span>}
-                          </label>
-                        );
-                      })}
-                    </div>
-                  </div>
 
-                  {/* Passo 1.1 Customização do 1º Burger */}
-                  <div className="detail-section combo-customization-box" style={{ background: "#fafafa", padding: "16px", borderRadius: "16px", border: "1px solid var(--line)", marginBottom: "20px" }}>
-                    <div className="detail-section-title" style={{ marginBottom: "14px" }}>
-                      <h3 style={{ color: "#ee8500" }}>{isMultiBurgerCombo ? "Customizar 1º Burger" : "Passo 2: Customizar"} ({comboBurger})</h3>
-                      <p>Ponto da carne, remoção de ingredientes e adicionais para <strong>{comboBurger}</strong>.</p>
-                    </div>
+                      {/* Customização do 1º Burger */}
+                      <div className="detail-section combo-customization-box" style={{ background: "#fafafa", padding: "16px", borderRadius: "16px", border: "1px solid var(--line)", marginTop: "16px", marginBottom: "20px" }}>
+                        <div className="detail-section-title" style={{ marginBottom: "14px" }}>
+                          <h3 style={{ color: "#ee8500" }}>Customizar {comboBurger || "1º Burger"}</h3>
+                          <p>Ponto da carne, remoção de ingredientes e adicionais para <strong>{comboBurger || "o 1º burger"}</strong>.</p>
+                        </div>
 
-                    <div style={{ marginBottom: "16px" }}>
-                      <strong style={{ display: "block", fontSize: "13px", marginBottom: "6px", color: "var(--text)" }}>Ponto da carne do {comboBurger}:</strong>
-                      <div className="meat-options">
-                        {["Ao ponto", "Bem passado", "Mal passado"].map((mode) => {
-                          const isSelected = meat === mode;
-                          return (
-                            <label key={mode} className={isSelected ? "is-selected" : ""}>
-                              <input name="meat" type="radio" checked={isSelected} onChange={() => setMeat(mode)} />
-                              {mode}
-                            </label>
-                          );
-                        })}
+                        <div style={{ marginBottom: "16px" }}>
+                          <strong style={{ display: "block", fontSize: "13px", marginBottom: "6px", color: "var(--text)" }}>Ponto da carne do {comboBurger}:</strong>
+                          <div className="meat-options">
+                            {["Ao ponto", "Bem passado", "Mal passado"].map((mode) => {
+                              const isSelected = meat === mode;
+                              return (
+                                <label key={mode} className={isSelected ? "is-selected" : ""}>
+                                  <input name="meat" type="radio" checked={isSelected} onChange={() => setMeat(mode)} />
+                                  {mode}
+                                </label>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        <div style={{ marginBottom: "16px" }}>
+                          <strong style={{ display: "block", fontSize: "13px", marginBottom: "6px", color: "var(--text)" }}>Remover ingredientes do {comboBurger}:</strong>
+                          <div className="option-grid compact-options">
+                            {removableItems.map((ing) => {
+                              const isRemoved = removedIngredients.includes(ing);
+                              return (
+                                <label key={ing} className={isRemoved ? "is-removed" : ""}>
+                                  <input type="checkbox" checked={isRemoved} onChange={() => toggleRemovedIngredient(ing)} />
+                                  <span>{ing}</span>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        <div>
+                          <strong style={{ display: "block", fontSize: "13px", marginBottom: "6px", color: "var(--text)" }}>Adicionais no {comboBurger}:</strong>
+                          <div className="option-grid extras-grid">
+                            {comboExtraOptions.map(([name, price]) => {
+                              const isSelected = extras.some((item) => item.name === name);
+                              return (
+                                <label className={`check-row ${isSelected ? "is-selected" : ""}`} key={name}>
+                                  <input type="checkbox" checked={isSelected} onChange={() => toggleExtra(name, price)} />
+                                  <span>{name}</span>
+                                  <strong>+ {money.format(price)}</strong>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        </div>
                       </div>
-                    </div>
 
-                    <div style={{ marginBottom: "16px" }}>
-                      <strong style={{ display: "block", fontSize: "13px", marginBottom: "6px", color: "var(--text)" }}>Remover ingredientes do {comboBurger}:</strong>
-                      <div className="option-grid compact-options">
-                        {removableItems.map((ing) => {
-                          const isRemoved = removedIngredients.includes(ing);
-                          return (
-                            <label key={ing} className={isRemoved ? "is-removed" : ""}>
-                              <input type="checkbox" checked={isRemoved} onChange={() => toggleRemovedIngredient(ing)} />
-                              <span>{ing}</span>
-                            </label>
-                          );
-                        })}
-                      </div>
+                      <button
+                        type="button"
+                        className="primary-btn full"
+                        disabled={!comboBurger}
+                        onClick={() => setActiveComboTab(isMultiBurgerCombo ? 2 : 2)}
+                        style={{ width: "100%", height: "52px", fontSize: "15px", borderRadius: "14px", marginTop: "12px" }}
+                      >
+                        {!comboBurger ? "Selecione o 1º Hambúrguer" : (isMultiBurgerCombo ? "Avançar para o 2º Hambúrguer →" : "Avançar para Acompanhamento →")}
+                      </button>
                     </div>
+                  )}
 
-                    <div>
-                      <strong style={{ display: "block", fontSize: "13px", marginBottom: "6px", color: "var(--text)" }}>Adicionais no {comboBurger}:</strong>
-                      <div className="option-grid extras-grid">
-                        {comboExtraOptions.map(([name, price]) => {
-                          const isSelected = extras.some((item) => item.name === name);
-                          return (
-                            <label className={`check-row ${isSelected ? "is-selected" : ""}`} key={name}>
-                              <input type="checkbox" checked={isSelected} onChange={() => toggleExtra(name, price)} />
-                              <span>{name}</span>
-                              <strong>+ {money.format(price)}</strong>
-                            </label>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Se o combo tiver 2 hambúrgueres: Passo 2: Escolha e Customização do 2º Burger */}
-                  {isMultiBurgerCombo && (
-                    <>
-                      <div className="detail-section combo-burger-section-2" style={{ borderTop: "2px dashed #ffe1ad", paddingTop: "20px" }}>
+                  {/* ETAPA 2: 2º HAMBÚRGUER (quando combo multi-burger) */}
+                  {activeComboTab === 2 && isMultiBurgerCombo && (
+                    <div className="combo-step-pane">
+                      <div className="detail-section combo-burger-section-2">
                         <div className="detail-section-title" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "8px" }}>
                           <div>
                             <h3 style={{ color: "#d97706" }}>Passo 2: Escolha o 2º Hambúrguer do Combo</h3>
@@ -2890,6 +2958,7 @@ function ProductDetail({
                             </span>
                           )}
                         </div>
+
                         <div className="meat-options" style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                           {(burgerProducts?.length ? burgerProducts : [
                             { id: "x-salada", name: "X-Salada", description: "Carne 90g, queijo prato e salada fresca", image: "/assets/products/x-salada-burgerc.webp", extraPrice: 0 },
@@ -2911,11 +2980,7 @@ function ProductDetail({
                               <label key={`b2-${b.id || b.name}`} className={isSelected ? "is-selected" : ""} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", borderRadius: "14px", width: "100%", boxSizing: "border-box", gap: "12px", cursor: "pointer" }}>
                                 <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
                                   <input name="comboBurger2" type="radio" checked={isSelected} onChange={() => setComboBurger2(b.name)} />
-                                  <img
-                                    src={burgerImg}
-                                    alt={b.name}
-                                    style={{ width: "48px", height: "48px", borderRadius: "10px", objectFit: "cover", flexShrink: 0, border: "1px solid var(--line)" }}
-                                  />
+                                  <img src={burgerImg} alt={b.name} style={{ width: "48px", height: "48px", borderRadius: "10px", objectFit: "cover", flexShrink: 0, border: "1px solid var(--line)" }} />
                                   <div style={{ textAlign: "left" }}>
                                     <strong style={{ fontSize: "15px", display: "block" }}>{b.name}</strong>
                                     <small style={{ display: "block", color: "#68717d", fontSize: "12px", marginTop: "2px", lineHeight: "1.25" }}>{b.description}</small>
@@ -2929,10 +2994,10 @@ function ProductDetail({
                       </div>
 
                       {/* Customização do 2º Burger */}
-                      <div className="detail-section combo-customization-box-2" style={{ background: "#fffdf9", padding: "16px", borderRadius: "16px", border: "1px solid #ffe1ad", marginBottom: "20px" }}>
+                      <div className="detail-section combo-customization-box-2" style={{ background: "#fffdf9", padding: "16px", borderRadius: "16px", border: "1px solid #ffe1ad", marginTop: "16px", marginBottom: "20px" }}>
                         <div className="detail-section-title" style={{ marginBottom: "14px" }}>
-                          <h3 style={{ color: "#d97706" }}>Customizar 2º Burger ({comboBurger2})</h3>
-                          <p>Ponto da carne, remoção de ingredientes e adicionais para <strong>{comboBurger2}</strong>.</p>
+                          <h3 style={{ color: "#d97706" }}>Customizar 2º Burger ({comboBurger2 || "2º Burger"})</h3>
+                          <p>Ponto da carne, remoção de ingredientes e adicionais para <strong>{comboBurger2 || "o 2º burger"}</strong>.</p>
                         </div>
 
                         <div style={{ marginBottom: "16px" }}>
@@ -2981,46 +3046,83 @@ function ProductDetail({
                           </div>
                         </div>
                       </div>
-                    </>
+
+                      <div style={{ display: "flex", gap: "10px", marginTop: "16px" }}>
+                        <button type="button" className="outline-btn" onClick={() => setActiveComboTab(1)} style={{ flex: 1, height: "52px", borderRadius: "14px" }}>← 1º Burger</button>
+                        <button
+                          type="button"
+                          className="primary-btn"
+                          disabled={!comboBurger2}
+                          onClick={() => setActiveComboTab(3)}
+                          style={{ flex: 2, height: "52px", fontSize: "15px", borderRadius: "14px" }}
+                        >
+                          {!comboBurger2 ? "Selecione o 2º Hambúrguer" : "Avançar para Acompanhamento →"}
+                        </button>
+                      </div>
+                    </div>
                   )}
 
-                  {/* Passo Acompanhamento */}
-                  <div className="detail-section combo-side-section">
-                    <div className="detail-section-title">
-                      <h3>Passo {isMultiBurgerCombo ? "3" : "3"}: Escolha o Acompanhamento</h3>
-                      <p>Acompanhamento incluso no seu combo.</p>
-                    </div>
-                    <div className="meat-options">
-                      {sideOptions.map((side) => {
-                        const isSelected = comboSide === side;
-                        return (
-                          <label key={side} className={isSelected ? "is-selected" : ""}>
-                            <input name="comboSide" type="radio" checked={isSelected} onChange={() => setComboSide(side)} />
-                            {side}
-                          </label>
-                        );
-                      })}
-                    </div>
-                  </div>
+                  {/* ETAPA Acompanhamento */}
+                  {activeComboTab === (isMultiBurgerCombo ? 3 : 2) && (
+                    <div className="combo-step-pane">
+                      <div className="detail-section combo-side-section">
+                        <div className="detail-section-title">
+                          <h3>Escolha o Acompanhamento</h3>
+                          <p>Acompanhamento incluso no seu combo.</p>
+                        </div>
+                        <div className="meat-options">
+                          {sideOptions.map((side) => {
+                            const isSelected = comboSide === side;
+                            return (
+                              <label key={side} className={isSelected ? "is-selected" : ""}>
+                                <input name="comboSide" type="radio" checked={isSelected} onChange={() => setComboSide(side)} />
+                                {side}
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
 
-                  {/* Passo Bebida */}
-                  <div className="detail-section combo-drink-section">
-                    <div className="detail-section-title">
-                      <h3>Passo {isMultiBurgerCombo ? "4" : "4"}: Escolha a Bebida do Combo</h3>
-                      <p>Refrigerante / bebida inclusa no seu combo.</p>
+                      <div style={{ display: "flex", gap: "10px", marginTop: "16px" }}>
+                        <button type="button" className="outline-btn" onClick={() => setActiveComboTab(isMultiBurgerCombo ? 2 : 1)} style={{ flex: 1, height: "52px", borderRadius: "14px" }}>← Hambúrguer</button>
+                        <button
+                          type="button"
+                          className="primary-btn"
+                          onClick={() => setActiveComboTab(isMultiBurgerCombo ? 4 : 3)}
+                          style={{ flex: 2, height: "52px", fontSize: "15px", borderRadius: "14px" }}
+                        >
+                          Avançar para Bebida →
+                        </button>
+                      </div>
                     </div>
-                    <div className="meat-options">
-                      {drinkOptions.map((drink) => {
-                        const isSelected = comboDrink === drink;
-                        return (
-                          <label key={drink} className={isSelected ? "is-selected" : ""}>
-                            <input name="comboDrink" type="radio" checked={isSelected} onChange={() => setComboDrink(drink)} />
-                            {drink}
-                          </label>
-                        );
-                      })}
+                  )}
+
+                  {/* ETAPA Bebida */}
+                  {activeComboTab === (isMultiBurgerCombo ? 4 : 3) && (
+                    <div className="combo-step-pane">
+                      <div className="detail-section combo-drink-section">
+                        <div className="detail-section-title">
+                          <h3>Escolha a Bebida do Combo</h3>
+                          <p>Refrigerante / bebida inclusa no seu combo.</p>
+                        </div>
+                        <div className="meat-options">
+                          {drinkOptions.map((drink) => {
+                            const isSelected = comboDrink === drink;
+                            return (
+                              <label key={drink} className={isSelected ? "is-selected" : ""}>
+                                <input name="comboDrink" type="radio" checked={isSelected} onChange={() => setComboDrink(drink)} />
+                                {drink}
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      <div style={{ display: "flex", gap: "10px", marginTop: "16px" }}>
+                        <button type="button" className="outline-btn" onClick={() => setActiveComboTab(isMultiBurgerCombo ? 3 : 2)} style={{ flex: 1, height: "52px", borderRadius: "14px" }}>← Acompanhamento</button>
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </>
               )}
 
