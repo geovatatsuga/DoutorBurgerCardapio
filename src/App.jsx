@@ -2300,25 +2300,26 @@ function WhyCard() {
 
 function Combos({ products, openProduct, isStoreOpen }) {
   if (!products.length) return null;
-  const labels = ["Mais pedido", "Combo especial", "Pronto para pedir"];
   return (
     <section className="section-block combo-section" id="combos">
       <div className="section-head compact">
         <div>
-          <span className="eyebrow">Combos prontos</span>
-          <h2>Escolha um combo e peca mais rapido</h2>
-          <p>Combos completos com burger, batata e bebida para matar sua fome com praticidade e sabor.</p>
+          <span className="eyebrow">Combos Especiais</span>
+          <h2>Escolha o seu combo e economize</h2>
+          <p>Opções individuais e para compartilhar, com burger, acompanhamentos crocantes e refrigerante gelado.</p>
         </div>
       </div>
       <div className="combo-grid">
-        {products.slice(0, 3).map((product, index) => {
+        {products.map((product) => {
+          const isShareable = product.name.includes("Dupla") || product.name.includes("Degustação") || product.name.includes("Galera");
+          const tagLabel = isShareable ? "Para Compartilhar 👥" : "Combo Individual 👤";
           return (
             <article className="combo-card" key={product.id} onClick={() => openProduct(product.id)} style={{ cursor: "pointer" }}>
               <img src={product.image} alt={product.name} width="960" height="960" loading="lazy" decoding="async" />
-              <span>{labels[index]}</span>
+              <span style={{ background: isShareable ? "var(--accent-strong)" : "var(--accent)", color: "#fff" }}>{tagLabel}</span>
               <h3>{product.name}</h3>
               <ul className="combo-includes">
-                {product.description.split(",").slice(0, 3).map((item) => <li key={item}>{item.trim()}</li>)}
+                {product.description.split(",").map((item) => <li key={item}>{item.trim()}</li>)}
               </ul>
               <strong>{money.format(product.price)}</strong>
               {isStoreOpen && <button className="combo-cta" onClick={(event) => { event.stopPropagation(); openProduct(product.id); }}>Ver combo</button>}
