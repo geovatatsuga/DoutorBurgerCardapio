@@ -296,6 +296,7 @@ export default function App() {
   const [isAboutOpen, setIsAboutOpen] = useState(false);
   const [isFaqOpen, setIsFaqOpen] = useState(false);
   const [isPrivacyOpen, setIsPrivacyOpen] = useState(false);
+  const [isTermsOpen, setIsTermsOpen] = useState(false);
   const [cookieConsent, setCookieConsent] = useState(() => localStorage.getItem("doutor_cookie_consent") || null);
 
   const toggleExtra2 = (name, price) => {
