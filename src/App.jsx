@@ -2808,7 +2808,7 @@ function ProductDetail({
                         </div>
                         <div className="option-grid compact-options">
                           {removableItems.map((ing) => {
-                            const isRemoved = removedIngredients.includes(ing);
+                            const isRemoved = (removedIngredients || []).includes(ing);
                             return (
                               <label key={ing} className={isRemoved ? "is-removed" : ""}>
                                 <input type="checkbox" checked={isRemoved} onChange={() => toggleRemovedIngredient(ing)} />
@@ -2837,7 +2837,7 @@ function ProductDetail({
                           <div>
                             <strong style={{ color: "#15803d", fontSize: "14px", display: "block" }}>✓ 1º Burger Escolhido: {comboBurger || "X-Salada"} ({meat})</strong>
                             <small style={{ color: "#166534", fontSize: "12px" }}>
-                              {removedIngredients.length ? `Sem: ${removedIngredients.join(", ")}` : "Sem remoções"}
+                              {(removedIngredients || []).length ? `Sem: ${(removedIngredients || []).join(", ")}` : "Sem remoções"}
                             </small>
                           </div>
                           <button type="button" className="outline-btn" onClick={() => setComboStep(1)} style={{ fontSize: "12px", padding: "4px 10px", height: "auto", minHeight: "unset" }}>Alterar 1º Burger</button>
@@ -2913,7 +2913,7 @@ function ProductDetail({
                             </div>
                             <div className="option-grid compact-options">
                               {removableItems.map((ing) => {
-                                const isRemoved = removedIngredients.includes(ing);
+                                const isRemoved = (removedIngredients || []).includes(ing);
                                 return (
                                   <label key={ing} className={isRemoved ? "is-removed" : ""}>
                                     <input type="checkbox" checked={isRemoved} onChange={() => toggleRemovedIngredient(ing)} />
@@ -2993,7 +2993,7 @@ function ProductDetail({
                             </div>
                             <div className="option-grid compact-options">
                               {removableItems.map((ing) => {
-                                const isRemoved = removedIngredients2.includes(ing);
+                                const isRemoved = (removedIngredients2 || []).includes(ing);
                                 return (
                                   <label key={`rem2-${ing}`} className={isRemoved ? "is-removed" : ""}>
                                     <input type="checkbox" checked={isRemoved} onChange={() => toggleRemovedIngredient2(ing)} />
@@ -3075,7 +3075,7 @@ function ProductDetail({
                     </div>
                     <div className="option-grid compact-options">
                       {removableItems.map((ing) => {
-                        const isRemoved = removedIngredients.includes(ing);
+                        const isRemoved = (removedIngredients || []).includes(ing);
                         return (
                           <label key={ing} className={isRemoved ? "is-removed" : ""}>
                             <input type="checkbox" checked={isRemoved} onChange={() => toggleRemovedIngredient(ing)} />
