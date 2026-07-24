@@ -2316,20 +2316,20 @@ function Header({ count, onHome, onCart, onTrack, currentClientOrder, isStoreOpe
         {currentClientOrder ? (
           <button
             type="button"
-            className="outline-btn"
-            style={{ padding: "6px 12px", fontSize: "12px", borderRadius: "20px", fontWeight: "800", background: "var(--bg)", borderColor: "var(--accent)" }}
+            className="primary-btn"
+            style={{ display: "inline-flex", alignItems: "center", gap: "8px", padding: "8px 16px", fontSize: "13px", borderRadius: "20px", fontWeight: "900", background: "linear-gradient(135deg, #ee8500, #ff5500)", border: "none", color: "#fff", boxShadow: "0 4px 14px rgba(238, 133, 0, 0.35)" }}
             onClick={onTrack}
           >
-            🛵 Acompanhar Pedido ({currentClientOrder.status})
+            <Icon name="bike" /> Acompanhar ({currentClientOrder.status})
           </button>
         ) : (
           <button
             type="button"
             className="outline-btn"
-            style={{ padding: "6px 12px", fontSize: "12px", borderRadius: "20px", fontWeight: "800" }}
+            style={{ display: "inline-flex", alignItems: "center", gap: "6px", padding: "8px 14px", fontSize: "13px", borderRadius: "20px", fontWeight: "800", background: "#fff", borderColor: "#e2e8f0" }}
             onClick={onTrack}
           >
-            🔍 Meus Pedidos
+            <Icon name="search" /> Meus Pedidos
           </button>
         )}
         <button className="cart-top-btn" onClick={onCart}><Icon name="cart" /> Carrinho <span id="cartBadgeTop">{count}</span></button>
@@ -3276,6 +3276,13 @@ function Icon({ name }) {
     heart: "M20 8c0 6-8 11-8 11S4 14 4 8a4 4 0 0 1 7-2 4 4 0 0 1 9 2Z",
     flame: "M12 22c4 0 7-3 7-7 0-3-2-5-4-7 .2 2-.8 3-2 4 .2-4-2-7-5-9 .5 4-3 6-3 11 0 5 3 8 7 8Z",
     star: "m12 3 2.7 5.5 6.1.9-4.4 4.3 1 6.1-5.4-2.9-5.4 2.9 1-6.1-4.4-4.3 6.1-.9L12 3Z",
+    search: "M21 21l-5.2-5.2M10 17a7 7 0 1 0 0-14 7 7 0 0 0 0 14Z",
+    document: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6Zm-1 2 4.5 4.5H13V4Z",
+    mapPin: "M12 2a8 8 0 0 0-8 8c0 5.25 8 12 8 12s8-6.75 8-12a8 8 0 0 0-8-8Zm0 11a3 3 0 1 1 0-6 3 3 0 0 1 0 6Z",
+    phone: "M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92Z",
+    faq: "M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20Zm0-6h.01M12 8a2.5 2.5 0 0 1 2.5 2.5c0 1.5-1.5 2-2.5 3",
+    shieldCheck: "M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z",
+    sparkles: "m12 3 2.2 4.8L19 10l-4.8 2.2L12 17l-2.2-4.8L5 10l4.8-2.2L12 3Z",
   };
   return (
     <svg className="ui-icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -3893,7 +3900,9 @@ function AboutModal({ isOpen, onClose, storeSettings }) {
       <div className="drawer-card" style={{ maxWidth: "540px", padding: "28px", borderRadius: "24px" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "20px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-            <img src="/assets/brand/logo.png" alt="Doutor Burger" style={{ width: "44px", height: "44px", borderRadius: "50%" }} />
+            <span style={{ width: "48px", height: "48px", borderRadius: "50%", background: "#fffdf8", border: "2px solid #ee8500", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+              <img src="/assets/brand/logo.png" alt="Doutor Burger" style={{ width: "44px", height: "44px", objectFit: "cover" }} />
+            </span>
             <div>
               <h2 style={{ fontSize: "20px", fontWeight: "900", margin: 0 }}>Sobre o Doutor Burger</h2>
               <small style={{ color: "#68717d" }}>Cura sua fome de hambúrguer de verdade</small>
@@ -3903,37 +3912,63 @@ function AboutModal({ isOpen, onClose, storeSettings }) {
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: "16px", fontSize: "14px", color: "#333", lineHeight: 1.6 }}>
-          <div style={{ background: "#fffdf8", border: "1px solid #f1dec3", padding: "16px", borderRadius: "16px" }}>
-            <h3 style={{ fontSize: "15px", fontWeight: "800", color: "#ee8500", marginTop: 0, marginBottom: "6px" }}>🍔 Nossa História</h3>
-            <p style={{ margin: 0, color: "#4b5563" }}>
+          <div style={{ background: "linear-gradient(135deg, #fffdf8 0%, #fff7ec 100%)", border: "1px solid #f1dec3", padding: "18px", borderRadius: "18px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#ee8500", fontWeight: "800", marginBottom: "8px" }}>
+              <Icon name="burger" />
+              <h3 style={{ fontSize: "16px", margin: 0, color: "#ee8500" }}>Nossa História & Paixão</h3>
+            </div>
+            <p style={{ margin: 0, color: "#4b5563", fontSize: "14px", lineHeight: "1.55" }}>
               O Doutor Burger nasceu em João Pessoa com a missão de entregar o melhor hambúrguer artesanal delivery da cidade. Preparamos nossos blends com carnes 100% bovinas selecionadas (90g e 180g), pão brioche macio e selado na manteiga e maioneses autorais preparadas diariamente.
             </p>
           </div>
 
-          <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", padding: "16px", borderRadius: "16px", display: "flex", flexDirection: "column", gap: "10px" }}>
-            <div>
-              <strong style={{ display: "block", color: "#1e293b" }}>📍 Endereço da Lanchonete:</strong>
-              <span style={{ color: "#64748b", fontSize: "13px" }}>{storeSettings?.address || "Rua Clotilde Torres, 116-B, Casa - Alto do Mateus, João Pessoa - PB, CEP 58090-240"}</span>
+          <div style={{ background: "#ffffff", border: "1px solid #e2e8f0", padding: "18px", borderRadius: "18px", display: "flex", flexDirection: "column", gap: "14px" }}>
+            <div style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
+              <div style={{ background: "#eff6ff", color: "#2563eb", padding: "8px", borderRadius: "10px", display: "flex", shrink: 0 }}>
+                <Icon name="mapPin" />
+              </div>
+              <div>
+                <strong style={{ display: "block", color: "#1e293b", fontSize: "14px" }}>Endereço da Lanchonete</strong>
+                <span style={{ color: "#64748b", fontSize: "13px" }}>{storeSettings?.address || "Rua Clotilde Torres, 116-B, Casa - Alto do Mateus, João Pessoa - PB, CEP 58090-240"}</span>
+              </div>
             </div>
-            <div>
-              <strong style={{ display: "block", color: "#1e293b" }}>📜 CNPJ Oficial:</strong>
-              <span style={{ color: "#64748b", fontSize: "13px", fontWeight: 700 }}>67.929.090/0001-70</span>
+
+            <div style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
+              <div style={{ background: "#f0fdf4", color: "#16a34a", padding: "8px", borderRadius: "10px", display: "flex", shrink: 0 }}>
+                <Icon name="document" />
+              </div>
+              <div>
+                <strong style={{ display: "block", color: "#1e293b", fontSize: "14px" }}>Registro Oficial & CNPJ</strong>
+                <span style={{ color: "#64748b", fontSize: "13px", fontWeight: 700 }}>67.929.090/0001-70</span>
+              </div>
             </div>
-            <div>
-              <strong style={{ display: "block", color: "#1e293b" }}>🕒 Horário de Funcionamento:</strong>
-              <span style={{ color: "#64748b", fontSize: "13px" }}>Terça a Domingo: {storeSettings?.openHour || "18:00"} às {storeSettings?.closeHour || "23:30"} (Segunda: Fechado)</span>
+
+            <div style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
+              <div style={{ background: "#fef3c7", color: "#d97706", padding: "8px", borderRadius: "10px", display: "flex", shrink: 0 }}>
+                <Icon name="clock" />
+              </div>
+              <div>
+                <strong style={{ display: "block", color: "#1e293b", fontSize: "14px" }}>Horário de Funcionamento</strong>
+                <span style={{ color: "#64748b", fontSize: "13px" }}>Terça a Domingo: {storeSettings?.openHour || "18:00"} às {storeSettings?.closeHour || "23:30"} (Segunda: Fechado)</span>
+              </div>
             </div>
-            <div>
-              <strong style={{ display: "block", color: "#1e293b" }}>📱 Telefone & WhatsApp:</strong>
-              <a href={whatsappUrl} target="_blank" rel="noreferrer" style={{ color: "#25D366", fontWeight: "800", textDecoration: "none", fontSize: "14px" }}>
-                {storeSettings?.phone || "(83) 98765-4321"} (Clique para abrir no WhatsApp)
-              </a>
+
+            <div style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
+              <div style={{ background: "#f0fdf4", color: "#25D366", padding: "8px", borderRadius: "10px", display: "flex", shrink: 0 }}>
+                <Icon name="phone" />
+              </div>
+              <div>
+                <strong style={{ display: "block", color: "#1e293b", fontSize: "14px" }}>Atendimento no WhatsApp</strong>
+                <a href={whatsappUrl} target="_blank" rel="noreferrer" style={{ color: "#25D366", fontWeight: "800", textDecoration: "none", fontSize: "14px", display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                  {storeSettings?.phone || "(83) 98765-4321"} (Clique para conversar)
+                </a>
+              </div>
             </div>
           </div>
         </div>
 
         <button type="button" className="primary-btn full" onClick={onClose} style={{ marginTop: "24px", height: "48px", borderRadius: "14px" }}>
-          Fechar
+          Entendido
         </button>
       </div>
     </div>
