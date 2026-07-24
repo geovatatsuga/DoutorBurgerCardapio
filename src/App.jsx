@@ -326,8 +326,8 @@ export default function App() {
 
   // Admin Dashboard State
   const [selectedAdminOrderId, setSelectedAdminOrderId] = useState(() => orders[0]?.id || "");
-  const [loginEmail, setLoginEmail] = useState("");
-  const [loginPassword, setLoginPassword] = useState("");
+  const [loginEmail, setLoginEmail] = useState(() => import.meta.env.VITE_ADMIN_EMAIL || "");
+  const [loginPassword, setLoginPassword] = useState(() => import.meta.env.VITE_ADMIN_PASSWORD || "");
   const [loginError, setLoginError] = useState("");
 
   // Product Add/Edit Form State
