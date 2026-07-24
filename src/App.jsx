@@ -3852,82 +3852,118 @@ function FlowDrawer({
           </div>
         )}
 
-        {/* TRACK ORDER TIMELINE & SEARCH */}
         {flow === "track" && (
           <div className="flow-screen is-active">
-            {currentOrder ? (
-              <>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span className="eyebrow" style={{ color: "var(--accent-strong)", fontWeight: "800", textTransform: "uppercase", fontSize: "11px", letterSpacing: "1px" }}>
-                    Pedido {currentOrder.displayId || currentOrder.id}
-                  </span>
-                  <span className={`badge badge-${(currentOrder.status || "").toLowerCase().replace(/\s+/g, "")}`}>
-                    {currentOrder.status}
-                  </span>
-                </div>
-                <h2 style={{ fontSize: "20px", fontWeight: "900", margin: "4px 0 16px" }}>Acompanhar Status</h2>
-
-                <div style={{ background: "#f8fafc", padding: "12px 16px", borderRadius: "12px", marginBottom: "16px", fontSize: "13px" }}>
-                  <div><strong>Cliente:</strong> {currentOrder.name}</div>
-                  <div><strong>Forma de Pagamento:</strong> {currentOrder.payment}</div>
-                  <div><strong>Total:</strong> {money.format(currentOrder.total)}</div>
-                </div>
-
-                {currentOrder.status === "Cancelado" ? (
-                  <div style={{ background: "#fee2e2", border: "1px solid #fca5a5", color: "#b91c1c", padding: "14px", borderRadius: "12px", margin: "16px 0", fontSize: "14px" }}>
-                    <strong>❌ Pedido Cancelado</strong>
-                    <p style={{ margin: "4px 0 0", fontSize: "13px" }}>Este pedido foi cancelado pela loja. Em caso de dúvidas, entre em contato via WhatsApp.</p>
-                  </div>
-                ) : (
-                  <ol className="timeline" style={{ listStyle: "none", padding: 0, margin: "20px 0" }}>
-                    {["Recebido", "Confirmado", "Em preparo", "Pronto", "Saiu para entrega", "Entregue"].map((step, index) => {
-                      const stepsList = ["Recebido", "Confirmado", "Em preparo", "Pronto", "Saiu para entrega", "Entregue"];
-                      const isDone = stepsList.indexOf(currentOrder.status) >= index;
-                      const isCurrent = currentOrder.status === step;
-
-                      return (
-                        <li key={step} className={isCurrent ? "current" : isDone ? "done" : ""} style={{ display: "flex", gap: "16px", marginBottom: "16px", position: "relative" }}>
-                          <span className="dot" style={{ width: "28px", height: "28px", borderRadius: "50%", background: isCurrent ? "var(--accent)" : isDone ? "#34792f" : "#e9ecef", color: isCurrent || isDone ? "#fff" : "#6c757d", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold", fontSize: "12px", zIndex: 2 }}>
-                            {isDone && !isCurrent ? "✓" : index + 1}
-                          </span>
-                          <div style={{ flex: 1 }}>
-                            <strong style={{ fontSize: "14px", color: isCurrent ? "var(--accent-strong)" : isDone ? "#1f2026" : "#868e96", fontWeight: "800" }}>{step}</strong>
-                            <p style={{ margin: "2px 0 0 0", fontSize: "12px", color: isCurrent ? "#495057" : "#6c757d" }}>
-                              {isCurrent ? "Esta etapa está ocorrendo agora no Doutor Burger." : isDone ? "Etapa concluída." : "Aguardando etapas anteriores."}
-                            </p>
-                          </div>
-                        </li>
-                      );
-                    })}
-                  </ol>
-                )}
-
-                <div style={{ display: "flex", gap: "10px", marginTop: "20px" }}>
-                  <button className="outline-btn" style={{ flex: 1 }} onClick={() => {
-                    if (window.confirm("Deseja buscar outro pedido?")) {
-                      localStorage.removeItem("doutor_client_order");
-                      window.location.reload();
-                    }
-                  }}>
-                    🔍 Buscar outro pedido
-                  </button>
-                  <button className="primary-btn" style={{ flex: 1 }} onClick={onClose}>
-                    Fechar
-                  </button>
-                </div>
-              </>
-            ) : (
-              <TrackOrderSearchForm onClose={onClose} onOrderFound={(ord) => {
-                if (ord) {
-                  localStorage.setItem("doutor_client_order", JSON.stringify(ord));
-                  window.location.reload();
-                }
-              }} />
-            )}
+            <TrackOrderTimelineView currentOrder={currentOrder} onClose={onClose} />
           </div>
         )}
       </section>
     </div>
+  );
+}
+
+function TrackOrderTimelineView({ currentOrder, onClose }) {
+  const [clientTimeline, setClientTimeline] = React.useState([]);
+
+  React.useEffect(() => {
+    if (currentOrder && currentOrder.dbId && supabase) {
+      supabase
+        .rpc("get_order_status_timeline", { p_order_id: currentOrder.dbId })
+        .then(({ data }) => {
+          if (data) setClientTimeline(data);
+        })
+        .catch(() => {});
+    }
+  }, [currentOrder?.dbId, currentOrder?.status]);
+
+  if (!currentOrder) {
+    return (
+      <TrackOrderSearchForm onClose={onClose} onOrderFound={(ord) => {
+        if (ord) {
+          localStorage.setItem("doutor_client_order", JSON.stringify(ord));
+          window.location.reload();
+        }
+      }} />
+    );
+  }
+
+  return (
+    <>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <span className="eyebrow" style={{ color: "var(--accent-strong)", fontWeight: "800", textTransform: "uppercase", fontSize: "11px", letterSpacing: "1px" }}>
+          Pedido {currentOrder.displayId || currentOrder.id}
+        </span>
+        <span className={`badge badge-${(currentOrder.status || "").toLowerCase().replace(/\s+/g, "")}`}>
+          {currentOrder.status}
+        </span>
+      </div>
+      <h2 style={{ fontSize: "20px", fontWeight: "900", margin: "4px 0 16px" }}>Acompanhar Status</h2>
+
+      <div style={{ background: "#f8fafc", padding: "12px 16px", borderRadius: "12px", marginBottom: "16px", fontSize: "13px" }}>
+        <div><strong>Cliente:</strong> {currentOrder.name}</div>
+        <div><strong>Forma de Pagamento:</strong> {currentOrder.payment}</div>
+        <div><strong>Total:</strong> {money.format(currentOrder.total)}</div>
+      </div>
+
+      {currentOrder.status === "Cancelado" ? (
+        <div style={{ background: "#fee2e2", border: "1px solid #fca5a5", color: "#b91c1c", padding: "14px", borderRadius: "12px", margin: "16px 0", fontSize: "14px" }}>
+          <strong>❌ Pedido Cancelado</strong>
+          <p style={{ margin: "4px 0 0", fontSize: "13px" }}>Este pedido foi cancelado pela loja. Em caso de dúvidas, entre em contato via WhatsApp.</p>
+        </div>
+      ) : (
+        <ol className="timeline" style={{ listStyle: "none", padding: 0, margin: "20px 0" }}>
+          {["Recebido", "Confirmado", "Em preparo", "Pronto", "Saiu para entrega", "Entregue"].map((step, index) => {
+            const stepsList = ["Recebido", "Confirmado", "Em preparo", "Pronto", "Saiu para entrega", "Entregue"];
+            const isDone = stepsList.indexOf(currentOrder.status) >= index;
+            const isCurrent = currentOrder.status === step;
+            
+            const timelineMatch = (clientTimeline || []).find((t) => {
+              const statusMap = { received: "Recebido", confirmed: "Confirmado", preparing: "Em preparo", ready: "Pronto", dispatched: "Saiu para entrega", completed: "Entregue" };
+              return statusMap[t.to_status] === step || t.to_status === step;
+            });
+
+            const stepTime = timelineMatch 
+              ? new Date(timelineMatch.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) 
+              : (index === 0 && currentOrder.time ? currentOrder.time : null);
+
+            return (
+              <li key={step} className={isCurrent ? "current" : isDone ? "done" : ""} style={{ display: "flex", gap: "16px", marginBottom: "16px", position: "relative" }}>
+                <span className="dot" style={{ width: "28px", height: "28px", borderRadius: "50%", background: isCurrent ? "var(--accent)" : isDone ? "#34792f" : "#e9ecef", color: isCurrent || isDone ? "#fff" : "#6c757d", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold", fontSize: "12px", zIndex: 2 }}>
+                  {isDone && !isCurrent ? "✓" : index + 1}
+                </span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <strong style={{ fontSize: "14px", color: isCurrent ? "var(--accent-strong)" : isDone ? "#1f2026" : "#868e96", fontWeight: "800" }}>{step}</strong>
+                    {stepTime && (
+                      <span style={{ fontSize: "12px", fontWeight: "800", color: isCurrent ? "#ee8500" : isDone ? "#16a34a" : "#94a3b8", background: isCurrent ? "#fff3e0" : isDone ? "#f0fdf4" : "transparent", padding: "2px 8px", borderRadius: "6px" }}>
+                        🕒 {stepTime}
+                      </span>
+                    )}
+                  </div>
+                  <p style={{ margin: "2px 0 0 0", fontSize: "12px", color: isCurrent ? "#495057" : "#6c757d" }}>
+                    {isCurrent ? "Esta etapa está ocorrendo agora no Doutor Burger." : isDone ? `Concluído${stepTime ? ` às ${stepTime}` : "."}` : "Aguardando etapas anteriores."}
+                  </p>
+                </div>
+              </li>
+            );
+          })}
+        </ol>
+      )}
+
+      <div style={{ display: "flex", gap: "10px", marginTop: "20px" }}>
+        <button className="outline-btn" style={{ flex: 1 }} onClick={() => {
+          if (window.confirm("Deseja buscar outro pedido?")) {
+            localStorage.removeItem("doutor_client_order");
+            window.location.reload();
+          }
+        }}>
+          🔍 Buscar outro pedido
+        </button>
+        <button className="primary-btn" style={{ flex: 1 }} onClick={onClose}>
+          Fechar
+        </button>
+      </div>
+    </>
   );
 }
 
