@@ -326,8 +326,10 @@ export default function App() {
 
   // Admin Dashboard State
   const [selectedAdminOrderId, setSelectedAdminOrderId] = useState(() => orders[0]?.id || "");
-  const [loginEmail, setLoginEmail] = useState("");
-  const [loginPassword, setLoginPassword] = useState("");
+  const defaultAdminEmail = import.meta.env.VITE_ADMIN_EMAIL || "burgerc.owner@alto.com";
+  const defaultAdminPassword = import.meta.env.VITE_ADMIN_PASSWORD || "BurgerC@2026";
+  const [loginEmail, setLoginEmail] = useState(defaultAdminEmail);
+  const [loginPassword, setLoginPassword] = useState(defaultAdminPassword);
   const [loginError, setLoginError] = useState("");
 
   // Product Add/Edit Form State
