@@ -687,7 +687,7 @@ export default function App() {
   const comboBurgerExtraPrice1 = (isCombo && selectedComboBurgerObj1) ? (selectedComboBurgerObj1.name === "Duplo" ? 8 : selectedComboBurgerObj1.name === "Agridoce" ? 4 : 0) : 0;
   const comboBurgerExtraPrice2 = (isMultiBurgerCombo && selectedComboBurgerObj2) ? (selectedComboBurgerObj2.name === "Duplo" ? 8 : selectedComboBurgerObj2.name === "Agridoce" ? 4 : 0) : 0;
   const comboBurgerExtraPrice = comboBurgerExtraPrice1 + comboBurgerExtraPrice2;
-  const comboSidePrice = (isCombo && (comboSide.includes("Onion Rings") || comboSide.includes("Nuggets"))) ? 3 : 0;
+  const comboSidePrice = (isCombo && (comboSide?.includes("Onion Rings") || comboSide?.includes("Nuggets"))) ? 3 : 0;
   const comboPrice = isBurger && combo ? 11.9 : 0;
   const extrasTotal1 = extras.reduce((sum, item) => sum + item.price, 0);
   const extrasTotal2 = isMultiBurgerCombo ? extras2.reduce((sum, item) => sum + item.price, 0) : 0;
@@ -2692,7 +2692,7 @@ function ProductDetail({
   };
 
   const extrasTotal = extras.reduce((sum, item) => sum + item.price, 0);
-  const comboSidePrice = (isCombo && comboSide.includes("Onion Rings")) ? 3 : 0;
+  const comboSidePrice = (isCombo && comboSide?.includes("Onion Rings")) ? 3 : 0;
   const selectedComboBurgerObj = (burgerProducts || []).find((b) => b.name === comboBurger);
   const comboBurgerExtraPrice = (isCombo && selectedComboBurgerObj) ? (selectedComboBurgerObj.name === "Duplo" ? 8 : selectedComboBurgerObj.name === "Agridoce" ? 4 : 0) : 0;
   const comboPrice = isBurger && combo ? 11.9 : 0;
@@ -2739,6 +2739,91 @@ function ProductDetail({
 
               {isCombo && (
                 <div className="combo-progressive-wrapper">
+                  <div className="combo-step-nav-bar" style={{ display: "flex", gap: "6px", overflowX: "auto", paddingBottom: "12px", marginBottom: "16px", borderBottom: "1px solid var(--line)" }}>
+                    <button
+                      type="button"
+                      onClick={() => setActiveComboTab(1)}
+                      style={{
+                        flex: "1 1 0px",
+                        padding: "8px 10px",
+                        borderRadius: "12px",
+                        fontSize: "12px",
+                        fontWeight: "800",
+                        border: activeComboTab === 1 ? "2px solid #ee8500" : "1px solid #e0e0e0",
+                        background: activeComboTab === 1 ? "#fff4dc" : comboBurger ? "#f0fdf4" : "#fff",
+                        color: activeComboTab === 1 ? "#d97900" : comboBurger ? "#166534" : "#666",
+                        cursor: "pointer",
+                        whiteSpace: "nowrap"
+                      }}
+                    >
+                      {comboBurger ? `✓ 1º Burger: ${comboBurger}` : "1. 1º Burger"}
+                    </button>
+                    
+                    {isMultiBurgerCombo && (
+                      <button
+                        type="button"
+                        onClick={() => comboBurger && setActiveComboTab(2)}
+                        disabled={!comboBurger}
+                        style={{
+                          flex: "1 1 0px",
+                          padding: "8px 10px",
+                          borderRadius: "12px",
+                          fontSize: "12px",
+                          fontWeight: "800",
+                          border: activeComboTab === 2 ? "2px solid #ee8500" : "1px solid #e0e0e0",
+                          background: activeComboTab === 2 ? "#fff4dc" : comboBurger2 ? "#f0fdf4" : "#fff",
+                          color: activeComboTab === 2 ? "#d97900" : comboBurger2 ? "#166534" : "#666",
+                          cursor: comboBurger ? "pointer" : "not-allowed",
+                          opacity: comboBurger ? 1 : 0.5,
+                          whiteSpace: "nowrap"
+                        }}
+                      >
+                        {comboBurger2 ? `✓ 2º Burger: ${comboBurger2}` : "2. 2º Burger"}
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() => (comboBurger && (!isMultiBurgerCombo || comboBurger2)) && setActiveComboTab(isMultiBurgerCombo ? 3 : 2)}
+                      disabled={!comboBurger || (isMultiBurgerCombo && !comboBurger2)}
+                      style={{
+                        flex: "1 1 0px",
+                        padding: "8px 10px",
+                        borderRadius: "12px",
+                        fontSize: "12px",
+                        fontWeight: "800",
+                        border: activeComboTab === (isMultiBurgerCombo ? 3 : 2) ? "2px solid #ee8500" : "1px solid #e0e0e0",
+                        background: activeComboTab === (isMultiBurgerCombo ? 3 : 2) ? "#fff4dc" : comboSide ? "#f0fdf4" : "#fff",
+                        color: activeComboTab === (isMultiBurgerCombo ? 3 : 2) ? "#d97900" : comboSide ? "#166534" : "#666",
+                        cursor: (comboBurger && (!isMultiBurgerCombo || comboBurger2)) ? "pointer" : "not-allowed",
+                        opacity: (comboBurger && (!isMultiBurgerCombo || comboBurger2)) ? 1 : 0.5,
+                        whiteSpace: "nowrap"
+                      }}
+                    >
+                      {comboSide ? `✓ Acompanhamento` : `${isMultiBurgerCombo ? "3" : "2"}. Acompanhamento`}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => (comboBurger && (!isMultiBurgerCombo || comboBurger2)) && setActiveComboTab(isMultiBurgerCombo ? 4 : 3)}
+                      disabled={!comboBurger || (isMultiBurgerCombo && !comboBurger2)}
+                      style={{
+                        flex: "1 1 0px",
+                        padding: "8px 10px",
+                        borderRadius: "12px",
+                        fontSize: "12px",
+                        fontWeight: "800",
+                        border: activeComboTab === (isMultiBurgerCombo ? 4 : 3) ? "2px solid #ee8500" : "1px solid #e0e0e0",
+                        background: activeComboTab === (isMultiBurgerCombo ? 4 : 3) ? "#fff4dc" : comboDrink ? "#f0fdf4" : "#fff",
+                        color: activeComboTab === (isMultiBurgerCombo ? 4 : 3) ? "#d97900" : comboDrink ? "#166534" : "#666",
+                        cursor: (comboBurger && (!isMultiBurgerCombo || comboBurger2)) ? "pointer" : "not-allowed",
+                        opacity: (comboBurger && (!isMultiBurgerCombo || comboBurger2)) ? 1 : 0.5,
+                        whiteSpace: "nowrap"
+                      }}
+                    >
+                      {comboDrink ? `✓ Bebida` : `${isMultiBurgerCombo ? "4" : "3"}. Bebida`}
+                    </button>
+                  </div>
                   {/* RESUMO COLAPSADO DO 1º BURGER (quando o usuário já passou da Etapa 1) */}
                   {activeComboTab > 1 ? (
                     <div className="combo-wizard-step-summary" onClick={() => setActiveComboTab(1)} style={{ cursor: "pointer", background: "#f0fdf4", border: "1px solid #bbf7d0", padding: "12px 16px", borderRadius: "16px", marginBottom: "14px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
