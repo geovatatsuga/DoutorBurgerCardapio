@@ -7532,3 +7532,46 @@ body.detail-mode .detail-copy > .purchase-bar {
   object-fit: cover;
   border: 1px solid #e2e8f0;
 }
+
+/* Progressive Combo Wizard & Desktop 2-Column Layout */
+.combo-progressive-wrapper {
+  margin-top: 16px;
+}
+
+.combo-wizard-step-summary {
+  transition: all 0.2s ease;
+}
+
+.combo-wizard-step-summary:hover {
+  background: #ecfdf5 !important;
+  border-color: #86efac !important;
+  transform: translateY(-1px);
+}
+
+@media (min-width: 900px) {
+  .product-detail {
+    max-width: 1060px !important;
+    padding: 32px !important;
+  }
+
+  .product-detail > div.detail-copy {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1.3fr) 360px !important;
+    gap: 28px !important;
+    align-items: start !important;
+  }
+
+  .detail-order-summary {
+    position: sticky !important;
+    top: 24px !important;
+    background: #fffdf9 !important;
+    border: 1px solid #ffe1ad !important;
+    border-radius: 20px !important;
+    padding: 24px !important;
+    box-shadow: 0 12px 32px rgba(238, 133, 0, 0.08) !important;
+  }
+
+  .purchase-bar {
+    display: none !important;
+  }
+}
