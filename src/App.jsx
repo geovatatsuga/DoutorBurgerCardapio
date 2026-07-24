@@ -2732,6 +2732,7 @@ function ProductDetail({
   const selectedComboBurgerObj = (burgerProducts || []).find((b) => b.name === comboBurger);
   const comboBurgerExtraPrice = (isCombo && selectedComboBurgerObj) ? (selectedComboBurgerObj.name === "Duplo" ? 8 : selectedComboBurgerObj.name === "Agridoce" ? 4 : 0) : 0;
   const comboPrice = isBurger && combo ? 11.9 : 0;
+  const sideSizePrice = isSide && sideSize === "Grande (G)" ? 5 : 0;
 
   return (
     <div className="drawer is-open" id="productDrawer" aria-hidden="false">
