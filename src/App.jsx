@@ -559,9 +559,13 @@ export default function App() {
           return [order, ...prev];
         });
       } else if (type === "UPDATE_STATUS") {
-        setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, status } : o)));
-        if (currentClientOrder && currentClientOrder.id === orderId) {
-          setCurrentClientOrder((prev) => ({ ...prev, status }));
+        const targetId = event.data.orderId;
+        const targetDbId = event.data.dbId;
+        setOrders((prev) => prev.map((o) => (o.id === targetId || o.dbId === targetDbId ? { ...o, status } : o)));
+        if (currentClientOrder && (currentClientOrder.id === targetId || currentClientOrder.dbId === targetDbId)) {
+          const updatedClientOrder = { ...currentClientOrder, status };
+          setCurrentClientOrder(updatedClientOrder);
+          localStorage.setItem("doutor_client_order", JSON.stringify(updatedClientOrder));
           playNotificationSound("client");
         }
       }
@@ -1055,13 +1059,19 @@ _Pedido enviado via Cardápio Digital!_`;
       return next;
     });
     setSavingOrderId("");
-    if (currentClientOrder && currentClientOrder.id === id) {
-      setCurrentClientOrder(prev => ({ ...prev, status: newStatus }));
+
+    // Sync active client order in state and localStorage
+    if (currentClientOrder && (currentClientOrder.id === target.id || currentClientOrder.dbId === target.dbId || currentClientOrder.id === id)) {
+      const updatedClientOrder = { ...currentClientOrder, status: newStatus };
+      setCurrentClientOrder(updatedClientOrder);
+      localStorage.setItem("doutor_client_order", JSON.stringify(updatedClientOrder));
     }
+
     if (orderChannel) {
       orderChannel.postMessage({
         type: "UPDATE_STATUS",
-        orderId: id,
+        orderId: target.id,
+        dbId: target.dbId,
         status: newStatus
       });
     }
