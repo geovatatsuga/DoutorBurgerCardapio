@@ -292,6 +292,7 @@ export default function App() {
   const [meat2, setMeat2] = useState("Ao ponto");
   const [removedIngredients2, setRemovedIngredients2] = useState([]);
   const [extras2, setExtras2] = useState([]);
+  const [sideSize, setSideSize] = useState("Média (P)");
 
   const toggleExtra2 = (name, price) => {
     setExtras2((prev) =>
@@ -692,16 +693,32 @@ export default function App() {
   const extrasTotal1 = extras.reduce((sum, item) => sum + item.price, 0);
   const extrasTotal2 = isMultiBurgerCombo ? extras2.reduce((sum, item) => sum + item.price, 0) : 0;
   const extrasTotal = extrasTotal1 + extrasTotal2;
-  const detailUnitPrice = selectedProduct ? (selectedProduct.price + extrasTotal + comboPrice + comboSidePrice + comboBurgerExtraPrice) : 0;
+  const sideSizePrice = (selectedProduct && (selectedProduct.category === "Acompanhamentos" || selectedProduct.category === "Batatas" || selectedProduct.category?.toLowerCase().includes("acomp")) && sideSize === "Grande (G)") ? 5 : 0;
+  const detailUnitPrice = selectedProduct ? (selectedProduct.price + extrasTotal + comboPrice + comboSidePrice + comboBurgerExtraPrice + sideSizePrice) : 0;
 
   const filteredProducts = useMemo(() => {
     const term = search.trim().toLowerCase();
-    return products.filter((product) => {
+    const rawList = products.filter((product) => {
       const matchesCategory = product.category === activeCategory;
       const matchesSearch = !term || `${product.name} ${product.description}`.toLowerCase().includes(term);
       const isAvailable = product.active !== false;
       return matchesCategory && matchesSearch && isAvailable;
     });
+
+    if (activeCategory === "Acompanhamentos" || activeCategory === "Batatas") {
+      const seen = new Set();
+      return rawList.filter((p) => {
+        const cleanName = p.name.replace(/\s+(P|G|\(P\)|\(G\))$/i, "").trim().toLowerCase();
+        if (seen.has(cleanName)) return false;
+        seen.add(cleanName);
+        return true;
+      }).map((p) => ({
+        ...p,
+        name: p.name.replace(/\s+(P|G|\(P\)|\(G\))$/i, "").trim()
+      }));
+    }
+
+    return rawList;
   }, [activeCategory, search, products]);
 
   function openProduct(id) {
@@ -714,6 +731,7 @@ export default function App() {
     setExtras2([]);
     setRemovedIngredients2([]);
     setMeat2("Ao ponto");
+    setSideSize("Média (P)");
     setCombo(false);
     setComboDrink("Coca-Cola 350ml");
     setComboSide("Batata Frita Crocante");
@@ -793,6 +811,9 @@ export default function App() {
         : `Burger: ${burger1Details} | Acomp: ${comboSide} | Bebida: ${comboDrink}`
       : "";
 
+    const isSide = Boolean(selectedProduct && (selectedProduct.category === "Acompanhamentos" || selectedProduct.category === "Batatas" || selectedProduct.category?.toLowerCase().includes("acomp")));
+    const semIngredientsText = (removedIngredients || []).length > 0 ? `Sem: ${(removedIngredients || []).join(", ")}` : "";
+
     const uniqueKey = Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
     setCart((items) => [
       ...items,
@@ -808,7 +829,8 @@ export default function App() {
           : [
               semIngredientsText,
               isBurger ? `Ponto: ${meat}` : "",
-              ...extras.map((item) => item.name),
+              isSide ? `Tamanho: ${sideSize}` : "",
+              ...(extras || []).map((item) => item.name),
               note.trim()
             ].filter(Boolean).join(" + "),
       },
@@ -2200,6 +2222,8 @@ _Pedido enviado via Cardápio Digital!_`;
           toggleExtra={toggleExtra}
           meat={meat}
           setMeat={setMeat}
+          sideSize={sideSize}
+          setSideSize={setSideSize}
           combo={combo}
           setCombo={setCombo}
           comboDrink={comboDrink}
@@ -2534,6 +2558,8 @@ function ProductDetail({
   toggleExtra,
   meat,
   setMeat,
+  sideSize,
+  setSideSize,
   combo,
   setCombo,
   comboDrink,
@@ -2570,6 +2596,14 @@ function ProductDetail({
     product && !isCombo && (
       product.category === "Burgers" ||
       (product.category !== "Bebidas" && product.category !== "Acompanhamentos" && product.category !== "Sobremesas")
+    )
+  );
+  const isSide = Boolean(
+    product && !isCombo && (
+      product.category === "Acompanhamentos" ||
+      product.category === "Batatas" ||
+      (product.category && product.category.toLowerCase().includes("batata")) ||
+      (product.category && product.category.toLowerCase().includes("acomp"))
     )
   );
   const isMultiBurgerCombo = Boolean(
@@ -3115,11 +3149,41 @@ function ProductDetail({
                 </>
               )}
 
+              {isSide && (
+                <div className="detail-section side-size-section">
+                  <div className="detail-section-title">
+                    <h3>Escolha o Tamanho da Porção</h3>
+                    <p>Selecione o tamanho desejado para o seu acompanhamento.</p>
+                  </div>
+                  <div className="meat-options" style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                    {[
+                      { label: "Média (P)", extra: 0, desc: "Porção individual padrão (ideal para 1 pessoa)" },
+                      { label: "Grande (G)", extra: 5, desc: "Porção grande reforçada (ideal para compartilhar)" },
+                    ].map((size) => {
+                      const isSelected = sideSize === size.label;
+                      return (
+                        <label key={size.label} className={isSelected ? "is-selected" : ""} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 14px", borderRadius: "14px", cursor: "pointer" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                            <input name="sideSize" type="radio" checked={isSelected} onChange={() => setSideSize(size.label)} />
+                            <div style={{ textAlign: "left" }}>
+                              <strong style={{ fontSize: "15px", display: "block" }}>{size.label}</strong>
+                              <small style={{ color: "#68717d", fontSize: "12px" }}>{size.desc}</small>
+                            </div>
+                          </div>
+                          {size.extra > 0 && <span style={{ fontWeight: 800, color: "#ee8500", fontSize: "13px" }}>+ {money.format(size.extra)}</span>}
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               <label className="note-box"><span>Observações</span><textarea value={note} onChange={(event) => setNote(event.target.value)} maxLength={120} placeholder="Ex.: sem cebola, molho à parte..." /></label>
               <aside className="detail-order-summary">
                 <h3>Resumo do pedido</h3>
                 <div><span>Subtotal</span><strong>{money.format(product.price)}</strong></div>
                 {extrasTotal > 0 && <div><span>Extras</span><strong>{money.format(extrasTotal)}</strong></div>}
+                {sideSizePrice > 0 && <div><span>Tamanho ({sideSize})</span><strong>{money.format(sideSizePrice)}</strong></div>}
                 {comboBurgerExtraPrice > 0 && <div><span>Opção Hambúrguer ({comboBurger})</span><strong>{money.format(comboBurgerExtraPrice)}</strong></div>}
                 {comboSidePrice > 0 && <div><span>Opção Acompanhamento</span><strong>{money.format(comboSidePrice)}</strong></div>}
                 {comboPrice > 0 && <div><span>Combo (Batata + Bebida)</span><strong>{money.format(comboPrice)}</strong></div>}
