@@ -293,6 +293,8 @@ export default function App() {
   const [removedIngredients2, setRemovedIngredients2] = useState([]);
   const [extras2, setExtras2] = useState([]);
   const [sideSize, setSideSize] = useState("Média (P)");
+  const [isAboutOpen, setIsAboutOpen] = useState(false);
+  const [isFaqOpen, setIsFaqOpen] = useState(false);
 
   const toggleExtra2 = (name, price) => {
     setExtras2((prev) =>
@@ -2188,6 +2190,8 @@ _Pedido enviado via Cardápio Digital!_`;
             openProduct={openProduct}
             addQuick={addQuick}
             isStoreOpen={isStoreOpen}
+            onOpenAbout={() => setIsAboutOpen(true)}
+            onOpenFaq={() => setIsFaqOpen(true)}
           />
           {view === "cart" && (
             <CartPanel
@@ -2275,6 +2279,8 @@ _Pedido enviado via Cardápio Digital!_`;
         checkoutError={checkoutError}
         setCheckoutError={setCheckoutError}
       />
+      <AboutModal isOpen={isAboutOpen} onClose={() => setIsAboutOpen(false)} storeSettings={storeSettings} />
+      <FaqModal isOpen={isFaqOpen} onClose={() => setIsFaqOpen(false)} storeSettings={storeSettings} />
     </>
   );
 }
@@ -2332,7 +2338,7 @@ function Header({ count, onHome, onCart, onTrack, currentClientOrder, isStoreOpe
   );
 }
 
-function Catalog({ activeCategory, categories, filteredProducts, products, storeSettings, deliveryZones, isStoreOpen, currentFee, currentMinOrder, search, setActiveCategory, setSearch, openProduct, addQuick }) {
+function Catalog({ activeCategory, categories, filteredProducts, products, storeSettings, deliveryZones, isStoreOpen, currentFee, currentMinOrder, search, setActiveCategory, setSearch, openProduct, addQuick, onOpenAbout, onOpenFaq }) {
   const comboProducts = products.filter((product) => product.active && product.category === "Combos");
   return (
     <section className="catalog" id="inicio">
@@ -2362,7 +2368,7 @@ function Catalog({ activeCategory, categories, filteredProducts, products, store
           <WhyCard />
         </div>
       </section>
-      <Footer />
+      <Footer storeSettings={storeSettings} onOpenAbout={onOpenAbout} onOpenFaq={onOpenFaq} />
     </section>
   );
 }
@@ -3832,13 +3838,179 @@ function TrackOrderSearchForm({ onClose, onOrderFound }) {
   );
 }
 
-function Footer() {
+function Footer({ storeSettings, onOpenAbout, onOpenFaq }) {
+  const whatsappNumber = storeSettings?.phone ? storeSettings.phone.replace(/\D/g, "") : "83987654321";
+  const whatsappUrl = `https://wa.me/55${whatsappNumber}`;
+
   return (
-    <footer className="site-footer">
-      <div className="brand"><span className="brand-mark"><img src="/assets/brand/logo.png" alt="Doutor Burger Logo" /></span><span><strong>Doutor Burger</strong><small>Cura sua fome</small></span></div>
-      <nav><a href="#inicio">Sobre nos</a><a href="https://wa.me/5583987654321" target="_blank" rel="noreferrer">WhatsApp</a><a href="#cardapio">Duvidas frequentes</a><a href="#ofertas">Promocoes</a></nav>
-      <p>Pix - Cartao - Dinheiro</p>
+    <footer className="site-footer" style={{ display: "flex", flexDirection: "column", gap: "16px", padding: "24px 28px", background: "rgba(255, 255, 255, 0.95)", border: "1px solid #f1dec3", borderRadius: "24px", marginTop: "24px" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "16px", borderBottom: "1px solid #f3e5d8", paddingBottom: "16px", width: "100%" }}>
+        <div className="brand" style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          <span className="brand-mark"><img src="/assets/brand/logo.png" alt="Doutor Burger Logo" style={{ width: "40px", height: "40px", borderRadius: "50%" }} /></span>
+          <div>
+            <strong style={{ fontSize: "18px", color: "var(--text)", display: "block" }}>Doutor Burger</strong>
+            <small style={{ color: "#68717d", fontSize: "12px" }}>Cura sua fome de hambúrguer de verdade</small>
+          </div>
+        </div>
+
+        <nav style={{ display: "flex", gap: "20px", flexWrap: "wrap", alignItems: "center" }}>
+          <button type="button" onClick={onOpenAbout} style={{ background: "none", border: "none", color: "#68717d", fontWeight: 800, fontSize: "14px", cursor: "pointer" }}>
+            Sobre nós
+          </button>
+          <a href={whatsappUrl} target="_blank" rel="noreferrer" style={{ color: "#25D366", fontWeight: 800, fontSize: "14px", display: "flex", alignItems: "center", gap: "6px", textDecoration: "none" }}>
+            WhatsApp ({storeSettings?.phone || "(83) 98765-4321"})
+          </a>
+          <button type="button" onClick={onOpenFaq} style={{ background: "none", border: "none", color: "#68717d", fontWeight: 800, fontSize: "14px", cursor: "pointer" }}>
+            Dúvidas frequentes
+          </button>
+        </nav>
+      </div>
+
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "12px", width: "100%", fontSize: "13px", color: "#68717d" }}>
+        <div>
+          <strong style={{ color: "#2c3036" }}>Doutor Burger Lanchonete LTDA</strong> · CNPJ: <strong>67.929.090/0001-70</strong>
+          <span style={{ display: "block", marginTop: "2px", fontSize: "12px", color: "#8a94a0" }}>
+            {storeSettings?.address || "Rua Clotilde Torres, 116-B, Casa - Alto do Mateus, João Pessoa - PB, CEP 58090-240"}
+          </span>
+        </div>
+        <div style={{ textAlign: "right" }}>
+          <span style={{ fontWeight: 700, color: "#2c3036", display: "block" }}>Pagamento seguro na entrega / retirada</span>
+          <small style={{ color: "#68717d" }}>Pix · Cartão de Crédito/Débito · Dinheiro</small>
+        </div>
+      </div>
     </footer>
+  );
+}
+
+function AboutModal({ isOpen, onClose, storeSettings }) {
+  if (!isOpen) return null;
+  const whatsappNumber = storeSettings?.phone ? storeSettings.phone.replace(/\D/g, "") : "83987654321";
+  const whatsappUrl = `https://wa.me/55${whatsappNumber}`;
+
+  return (
+    <div className="drawer is-open" style={{ zIndex: 9999 }}>
+      <div className="drawer-overlay" onClick={onClose} />
+      <div className="drawer-card" style={{ maxWidth: "540px", padding: "28px", borderRadius: "24px" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "20px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            <img src="/assets/brand/logo.png" alt="Doutor Burger" style={{ width: "44px", height: "44px", borderRadius: "50%" }} />
+            <div>
+              <h2 style={{ fontSize: "20px", fontWeight: "900", margin: 0 }}>Sobre o Doutor Burger</h2>
+              <small style={{ color: "#68717d" }}>Cura sua fome de hambúrguer de verdade</small>
+            </div>
+          </div>
+          <button type="button" className="close-btn" onClick={onClose} style={{ background: "none", border: "none", fontSize: "24px", cursor: "pointer" }}>✕</button>
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: "16px", fontSize: "14px", color: "#333", lineHeight: 1.6 }}>
+          <div style={{ background: "#fffdf8", border: "1px solid #f1dec3", padding: "16px", borderRadius: "16px" }}>
+            <h3 style={{ fontSize: "15px", fontWeight: "800", color: "#ee8500", marginTop: 0, marginBottom: "6px" }}>🍔 Nossa História</h3>
+            <p style={{ margin: 0, color: "#4b5563" }}>
+              O Doutor Burger nasceu em João Pessoa com a missão de entregar o melhor hambúrguer artesanal delivery da cidade. Preparamos nossos blends com carnes 100% bovinas selecionadas (90g e 180g), pão brioche macio e selado na manteiga e maioneses autorais preparadas diariamente.
+            </p>
+          </div>
+
+          <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", padding: "16px", borderRadius: "16px", display: "flex", flexDirection: "column", gap: "10px" }}>
+            <div>
+              <strong style={{ display: "block", color: "#1e293b" }}>📍 Endereço da Lanchonete:</strong>
+              <span style={{ color: "#64748b", fontSize: "13px" }}>{storeSettings?.address || "Rua Clotilde Torres, 116-B, Casa - Alto do Mateus, João Pessoa - PB, CEP 58090-240"}</span>
+            </div>
+            <div>
+              <strong style={{ display: "block", color: "#1e293b" }}>📜 CNPJ Oficial:</strong>
+              <span style={{ color: "#64748b", fontSize: "13px", fontWeight: 700 }}>67.929.090/0001-70</span>
+            </div>
+            <div>
+              <strong style={{ display: "block", color: "#1e293b" }}>🕒 Horário de Funcionamento:</strong>
+              <span style={{ color: "#64748b", fontSize: "13px" }}>Terça a Domingo: {storeSettings?.openHour || "18:00"} às {storeSettings?.closeHour || "23:30"} (Segunda: Fechado)</span>
+            </div>
+            <div>
+              <strong style={{ display: "block", color: "#1e293b" }}>📱 Telefone & WhatsApp:</strong>
+              <a href={whatsappUrl} target="_blank" rel="noreferrer" style={{ color: "#25D366", fontWeight: "800", textDecoration: "none", fontSize: "14px" }}>
+                {storeSettings?.phone || "(83) 98765-4321"} (Clique para abrir no WhatsApp)
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <button type="button" className="primary-btn full" onClick={onClose} style={{ marginTop: "24px", height: "48px", borderRadius: "14px" }}>
+          Fechar
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function FaqModal({ isOpen, onClose, storeSettings }) {
+  const [openFaqIndex, setOpenFaqIndex] = useState(0);
+  if (!isOpen) return null;
+
+  const faqs = [
+    {
+      q: "Qual o tempo médio de entrega dos pedidos?",
+      a: `Nosso tempo médio de entrega é de ${storeSettings?.deliveryTime || "35 a 45 minutos"} para os bairros atendidos em João Pessoa. Você pode acompanhar o status do seu pedido em tempo real na aba "Acompanhar".`
+    },
+    {
+      q: "Quais as formas de pagamento aceitas?",
+      a: "Aceitamos Pix (com código de cópia e cola / QR Code gerado automaticamente), Cartão de Crédito e Débito (na maquininha com o entregador) e Dinheiro (você pode informar se precisa de troco ao finalizar o pedido)."
+    },
+    {
+      q: "Como funcionam os Combos de Hambúrguer?",
+      a: "Nos Combos você escolhe os seus hambúrgueres preferidos, seleciona o ponto da carne e remoções de ingredientes para cada lanche individualmente, além do acompanhamento (Batatas ou Onion Rings) e a bebida inclusos com desconto exclusivo."
+    },
+    {
+      q: "Qual o valor mínimo do pedido para entrega?",
+      a: `O valor mínimo para pedidos de entrega em nosso cardápio é R$ ${money.format(storeSettings?.minOrder || 20)}.`
+    },
+    {
+      q: "Posso fazer o pedido para retirar no local?",
+      a: "Com certeza! Ao preencher seus dados de finalização, basta selecionar a opção 'Retirada no Balcão'. Assim você não paga taxa de entrega e retira direto em nossa cozinha no Alto do Mateus."
+    },
+    {
+      q: "Como entrar em contato com a lanchonete?",
+      a: `Você pode entrar em contato direto pelo nosso WhatsApp ${storeSettings?.phone || "(83) 98765-4321"}. Nossa equipe está sempre pronta para te atender!`
+    }
+  ];
+
+  return (
+    <div className="drawer is-open" style={{ zIndex: 9999 }}>
+      <div className="drawer-overlay" onClick={onClose} />
+      <div className="drawer-card" style={{ maxWidth: "560px", padding: "28px", borderRadius: "24px" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "20px" }}>
+          <div>
+            <h2 style={{ fontSize: "20px", fontWeight: "900", margin: 0 }}>Dúvidas Frequentes (FAQ)</h2>
+            <small style={{ color: "#68717d" }}>Respostas para as perguntas mais comuns dos nossos clientes</small>
+          </div>
+          <button type="button" className="close-btn" onClick={onClose} style={{ background: "none", border: "none", fontSize: "24px", cursor: "pointer" }}>✕</button>
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+          {faqs.map((faq, index) => {
+            const isOpenItem = openFaqIndex === index;
+            return (
+              <div key={index} style={{ border: "1px solid #e2e8f0", borderRadius: "14px", overflow: "hidden", background: isOpenItem ? "#fffdf8" : "#ffffff" }}>
+                <button
+                  type="button"
+                  onClick={() => setOpenFaqIndex(isOpenItem ? -1 : index)}
+                  style={{ width: "100%", padding: "14px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", background: "none", border: "none", textAlign: "left", cursor: "pointer" }}
+                >
+                  <strong style={{ fontSize: "14px", color: isOpenItem ? "#ee8500" : "#1e293b" }}>{faq.q}</strong>
+                  <span style={{ fontWeight: 800, fontSize: "16px", color: "#ee8500", marginLeft: "12px" }}>{isOpenItem ? "−" : "+"}</span>
+                </button>
+                {isOpenItem && (
+                  <div style={{ padding: "0 16px 14px 16px", fontSize: "13px", color: "#475569", lineHeight: 1.5, borderTop: "1px solid #f1f5f9", paddingTop: "10px" }}>
+                    {faq.a}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        <button type="button" className="primary-btn full" onClick={onClose} style={{ marginTop: "24px", height: "48px", borderRadius: "14px" }}>
+          Fechar Dúvidas
+        </button>
+      </div>
+    </div>
   );
 }
 
