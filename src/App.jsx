@@ -363,6 +363,7 @@ export default function App() {
   const [showCashClose, setShowCashClose] = useState(false);
   const [receiptOrder, setReceiptOrder] = useState(null);
   const [receiptType, setReceiptType] = useState("fiscal"); // "fiscal" or "cozinha"
+  const [autoPrintEnabled, setAutoPrintEnabled] = useState(() => localStorage.getItem("doutor_autoprint") === "true");
   const [session, setSession] = useState(null);
   const [authReady, setAuthReady] = useState(!supabase);
   const [supabaseNotice, setSupabaseNotice] = useState("");
@@ -1612,7 +1613,28 @@ _Pedido enviado via Cardápio Digital!_`;
               <span className="eyebrow">Gestão de Vendas</span>
               <h1>Central de Controle</h1>
             </div>
-            <div style={{ display: "flex", gap: "10px" }}>
+            <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+              <button
+                type="button"
+                className="outline-btn"
+                onClick={() => {
+                  const nextState = !autoPrintEnabled;
+                  localStorage.setItem("doutor_autoprint", String(nextState));
+                  setAutoPrintEnabled(nextState);
+                }}
+                style={{
+                  background: autoPrintEnabled ? "#dcfce7" : "#fff",
+                  borderColor: autoPrintEnabled ? "#16a34a" : "#e2e8f0",
+                  color: autoPrintEnabled ? "#15803d" : "#64748b",
+                  fontWeight: "800",
+                  fontSize: "12px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px"
+                }}
+              >
+                🖨️ {autoPrintEnabled ? "Impressão Auto: ATIVA" : "Impressão Auto: DESATIVADA"}
+              </button>
               <button className="primary-btn" onClick={() => setShowCashClose(true)} style={{ background: "var(--green)", boxShadow: "none", color: "#fff" }}>
                 Fechar Caixa (Dia)
               </button>
