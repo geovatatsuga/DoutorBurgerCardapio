@@ -1349,6 +1349,28 @@ _Pedido enviado via Cardápio Digital!_`;
     setModifierOptionPrice("");
   }
 
+  async function toggleModifierOptionActive(optionId, currentStatus, groupId) {
+    if (!supabase) return;
+    const { data, error } = await supabase
+      .from("modifier_options")
+      .update({ is_active: !currentStatus })
+      .eq("id", optionId)
+      .select("id,name,price_cents,is_active,sort_order")
+      .single();
+    if (error) {
+      alert(error.message);
+      return;
+    }
+    setModifierGroups((prev) => prev.map((group) => (
+      group.id === groupId
+        ? {
+            ...group,
+            modifier_options: (group.modifier_options || []).map((opt) => (opt.id === optionId ? data : opt))
+          }
+        : group
+    )));
+  }
+
   async function addStaffMember(e) {
     e.preventDefault();
     if (!supabase || !activeStoreId || !staffEmail.trim()) return;
@@ -1868,15 +1890,39 @@ _Pedido enviado via Cardápio Digital!_`;
                 </form>
               </div>
               <div className="admin-table" style={{ marginTop: "20px" }}>
-                <div className="table-row head"><span>Grupo</span><span>Opções</span><span>Seleção</span><span>Status</span></div>
-                {modifierGroups.map((group) => (
-                  <div className="table-row" key={group.id}>
-                    <span>{group.name}</span>
-                    <span>{(group.modifier_options || []).map((option) => `${option.name} (${money.format(centsToMoney(option.price_cents))})`).join(", ") || "Sem opções"}</span>
+                <div className="table-row head"><span>Grupo</span><span>Opções (Preço e Status)</span><span>Seleção</span><span>Status</span></div>
+                {modifierGroups.length ? modifierGroups.map((group) => (
+                  <div className="table-row" key={group.id} style={{ alignItems: "flex-start", padding: "14px 16px" }}>
+                    <strong>{group.name}</strong>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                      {(group.modifier_options || []).length ? (group.modifier_options || []).map((option) => (
+                        <div key={option.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#f8fafc", padding: "6px 12px", borderRadius: "8px", border: "1px solid #e2e8f0" }}>
+                          <span style={{ fontSize: "13px", color: option.is_active !== false ? "#1e293b" : "#94a3b8", textDecoration: option.is_active !== false ? "none" : "line-through" }}>
+                            {option.name} — <strong style={{ color: "#ee8500" }}>{money.format(centsToMoney(option.price_cents))}</strong>
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => toggleModifierOptionActive(option.id, option.is_active !== false, group.id)}
+                            style={{
+                              background: option.is_active !== false ? "#dcfce7" : "#fee2e2",
+                              color: option.is_active !== false ? "#15803d" : "#b91c1c",
+                              border: "none",
+                              borderRadius: "6px",
+                              padding: "2px 8px",
+                              fontSize: "11px",
+                              fontWeight: "800",
+                              cursor: "pointer"
+                            }}
+                          >
+                            {option.is_active !== false ? "Ativo" : "Pausado"}
+                          </button>
+                        </div>
+                      )) : <span style={{ color: "#94a3b8", fontSize: "12px" }}>Nenhuma opção cadastrada</span>}
+                    </div>
                     <span>{group.min_select} a {group.max_select}</span>
-                    <span>{group.is_required ? "Obrigatório" : "Opcional"}</span>
+                    <span style={{ fontWeight: "700", color: group.is_required ? "#d97706" : "#64748b" }}>{group.is_required ? "Obrigatório" : "Opcional"}</span>
                   </div>
-                ))}
+                )) : <div className="notice" style={{ padding: "16px" }}>Nenhum grupo de adicionais cadastrado ainda.</div>}
               </div>
             </section>
           )}
@@ -2244,6 +2290,7 @@ _Pedido enviado via Cardápio Digital!_`;
           onAdd={addSelectedProduct}
           removedIngredients={removedIngredients}
           setRemovedIngredients={setRemovedIngredients}
+          modifierGroups={modifierGroups}
         />
       )}
       <FlowDrawer
@@ -2590,6 +2637,7 @@ function ProductDetail({
   onAdd,
   removedIngredients,
   setRemovedIngredients,
+  modifierGroups = [],
 }) {
   const isCombo = Boolean(
     product && (
@@ -2668,7 +2716,7 @@ function ProductDetail({
     ["Calda Extra de Chocolate", 3],
   ];
 
-  const extraOptions = isCombo
+  const defaultExtraOptions = isCombo
     ? comboExtraOptions
     : isBurger
     ? burgerExtraOptions
@@ -2679,6 +2727,28 @@ function ProductDetail({
     : isDessert
     ? dessertExtraOptions
     : burgerExtraOptions;
+
+  const dbOptionsMap = useMemo(() => {
+    const list = [];
+    (modifierGroups || []).forEach((group) => {
+      (group.modifier_options || []).forEach((opt) => {
+        if (opt.is_active !== false) {
+          list.push([opt.name, centsToMoney(opt.price_cents)]);
+        }
+      });
+    });
+    return list;
+  }, [modifierGroups]);
+
+  const extraOptions = useMemo(() => {
+    const combined = [...defaultExtraOptions];
+    dbOptionsMap.forEach(([name, price]) => {
+      if (!combined.some(([n]) => n === name)) {
+        combined.push([name, price]);
+      }
+    });
+    return combined;
+  }, [defaultExtraOptions, dbOptionsMap]);
 
   const drinkOptions = [
     "Coca-Cola 350ml",
