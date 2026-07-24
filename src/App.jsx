@@ -296,8 +296,7 @@ export default function App() {
   const [isAboutOpen, setIsAboutOpen] = useState(false);
   const [isFaqOpen, setIsFaqOpen] = useState(false);
   const [isPrivacyOpen, setIsPrivacyOpen] = useState(false);
-  const [isTermsOpen, setIsTermsOpen] = useState(false);
-  const [cookieConsent, setCookieConsent] = useState(() => localStorage.getItem("doutor_cookie_consent") === "true");
+  const [cookieConsent, setCookieConsent] = useState(() => localStorage.getItem("doutor_cookie_consent") || null);
 
   const toggleExtra2 = (name, price) => {
     setExtras2((prev) =>
@@ -2342,43 +2341,70 @@ _Pedido enviado via Cardápio Digital!_`;
           bottom: "16px",
           left: "16px",
           right: "16px",
-          maxWidth: "520px",
+          maxWidth: "600px",
           margin: "0 auto",
-          background: "rgba(15, 23, 42, 0.95)",
-          backdropFilter: "blur(12px)",
+          background: "rgba(15, 23, 42, 0.96)",
+          backdropFilter: "blur(16px)",
           color: "#fff",
-          padding: "16px 20px",
-          borderRadius: "20px",
-          boxShadow: "0 10px 30px rgba(0,0,0,0.3)",
+          padding: "18px 22px",
+          borderRadius: "22px",
+          boxShadow: "0 14px 40px rgba(0,0,0,0.4)",
           zIndex: 99999,
           display: "flex",
-          alignItems: "center",
-          justify: "space-between",
-          gap: "16px"
+          flexDirection: "column",
+          gap: "14px",
+          border: "1px solid rgba(255, 255, 255, 0.1)"
         }}>
-          <div style={{ fontSize: "12px", lineHeight: "1.4" }}>
-            🍪 <strong>Aviso de Cookies & LGPD:</strong> Utilizamos cookies essenciais para salvar seu carrinho e melhorar sua experiência.
+          <div style={{ fontSize: "13px", lineHeight: "1.5", color: "#cbd5e1" }}>
+            🍪 <strong style={{ color: "#fff" }}>Gestão de Cookies & Privacidade (LGPD)</strong>
+            <span style={{ display: "block", marginTop: "4px" }}>
+              Utilizamos cookies essenciais para o funcionamento do carrinho e processamento de pedidos. Você pode escolher aceitar todos os cookies ou manter apenas os estritamente essenciais. Veja nossa{" "}
+              <button type="button" onClick={() => setIsPrivacyOpen(true)} style={{ background: "none", border: "none", color: "#ee8500", textDecoration: "underline", cursor: "pointer", padding: 0, fontWeight: 700 }}>
+                Política de Privacidade
+              </button>.
+            </span>
           </div>
-          <button
-            type="button"
-            onClick={() => {
-              localStorage.setItem("doutor_cookie_consent", "true");
-              setCookieConsent(true);
-            }}
-            style={{
-              background: "#ee8500",
-              color: "#fff",
-              border: "none",
-              padding: "8px 16px",
-              borderRadius: "12px",
-              fontWeight: "900",
-              fontSize: "12px",
-              cursor: "pointer",
-              whiteSpace: "nowrap"
-            }}
-          >
-            Aceitar
-          </button>
+
+          <div style={{ display: "flex", alignItems: "center", gap: "10px", justifyContent: "flex-end", flexWrap: "wrap" }}>
+            <button
+              type="button"
+              onClick={() => {
+                localStorage.setItem("doutor_cookie_consent", "essential");
+                setCookieConsent("essential");
+              }}
+              style={{
+                background: "rgba(255, 255, 255, 0.1)",
+                color: "#e2e8f0",
+                border: "1px solid rgba(255, 255, 255, 0.2)",
+                padding: "8px 14px",
+                borderRadius: "12px",
+                fontWeight: "700",
+                fontSize: "12px",
+                cursor: "pointer"
+              }}
+            >
+              Apenas Essenciais (Rejeitar Não Obrigatórios)
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                localStorage.setItem("doutor_cookie_consent", "accepted");
+                setCookieConsent("accepted");
+              }}
+              style={{
+                background: "#ee8500",
+                color: "#fff",
+                border: "none",
+                padding: "8px 18px",
+                borderRadius: "12px",
+                fontWeight: "900",
+                fontSize: "12px",
+                cursor: "pointer"
+              }}
+            >
+              Aceitar Todos os Cookies
+            </button>
+          </div>
         </div>
       )}
     </>
