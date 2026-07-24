@@ -962,32 +962,42 @@ p {
 }
 
 .product-detail {
-  display: grid;
-  grid-template-columns: minmax(300px, 390px) minmax(0, 1fr);
-  gap: 0;
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+  border-radius: 24px;
   overflow: hidden;
-  width: min(920px, calc(100% - 24px));
+  max-width: 840px;
+  width: calc(100% - 32px);
+  max-height: calc(100vh - 40px);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.28);
+}
+
+.detail-gallery {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 24px;
+  background: #fffdf9;
+  border-bottom: 1px solid #f2e6d5;
 }
 
 .detail-image {
-  align-self: stretch;
-  background: #24180f;
-  border-radius: 30px;
-  box-shadow: 0 22px 70px rgba(42, 31, 15, 0.22);
-  height: calc(100% - 48px);
-  margin: 24px;
-  min-height: 0;
+  width: 90px;
+  height: 90px;
+  border-radius: 16px;
   object-fit: cover;
-  object-position: center;
-  width: calc(100% - 48px);
+  flex-shrink: 0;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(0, 0, 0, 0.06);
 }
 
 .detail-copy {
   display: flex;
   flex-direction: column;
-  max-height: min(780px, calc(100vh - 44px));
+  flex: 1;
   overflow: auto;
-  padding: 36px 32px 24px;
+  padding: 20px 24px;
   position: relative;
 }
 
@@ -7533,7 +7543,7 @@ body.detail-mode .detail-copy > .purchase-bar {
   border: 1px solid #e2e8f0;
 }
 
-/* Progressive Combo Wizard & Desktop 2-Column Layout */
+/* Progressive Combo Wizard & Clean Responsive Modal Layout */
 .combo-progressive-wrapper {
   margin-top: 16px;
 }
@@ -7548,30 +7558,10 @@ body.detail-mode .detail-copy > .purchase-bar {
   transform: translateY(-1px);
 }
 
-@media (min-width: 900px) {
-  .product-detail {
-    max-width: 1060px !important;
-    padding: 32px !important;
-  }
-
-  .product-detail > div.detail-copy {
-    display: grid !important;
-    grid-template-columns: minmax(0, 1.3fr) 360px !important;
-    gap: 28px !important;
-    align-items: start !important;
-  }
-
-  .detail-order-summary {
-    position: sticky !important;
-    top: 24px !important;
-    background: #fffdf9 !important;
-    border: 1px solid #ffe1ad !important;
-    border-radius: 20px !important;
-    padding: 24px !important;
-    box-shadow: 0 12px 32px rgba(238, 133, 0, 0.08) !important;
-  }
-
-  .purchase-bar {
-    display: none !important;
+@media (min-width: 640px) {
+  .drawer-card.product-detail {
+    max-width: 780px !important;
+    width: 92% !important;
+    border-radius: 24px !important;
   }
 }

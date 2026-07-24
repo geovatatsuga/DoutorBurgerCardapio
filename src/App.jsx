@@ -2773,7 +2773,7 @@ function ProductDetail({
                           )}
                         </div>
 
-                        <div className="meat-options" style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                        <div className="meat-options" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: "10px" }}>
                           {(burgerProducts?.length ? burgerProducts : [
                             { id: "x-salada", name: "X-Salada", description: "Carne 90g, queijo prato e salada fresca", image: "/assets/products/x-salada-burgerc.webp", extraPrice: 0 },
                             { id: "cheeseburger", name: "Cheeseburger", description: "Carne 90g e cheddar derretido", image: "/assets/products/cheeseburger-burgerc.webp", extraPrice: 0 },
@@ -2791,7 +2791,7 @@ function ProductDetail({
                               Duplo: "/assets/products/duplo-burgerc.webp",
                             }[b.name] || "/assets/new-direction/doutor-burger.webp";
                             return (
-                              <label key={b.id || b.name} className={isSelected ? "is-selected" : ""} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", borderRadius: "14px", width: "100%", boxSizing: "border-box", gap: "12px", cursor: "pointer" }}>
+                              <label key={b.id || b.name} className={isSelected ? "is-selected" : ""} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 14px", borderRadius: "14px", border: isSelected ? "2px solid #ee8500" : "1px solid #e2e8f0", background: isSelected ? "#fffdf9" : "#fff", width: "100%", boxSizing: "border-box", gap: "12px", cursor: "pointer", transition: "all 0.15s ease" }}>
                                 <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
                                   <input name="comboBurger" type="radio" checked={isSelected} onChange={() => setComboBurger(b.name)} />
                                   <img src={burgerImg} alt={b.name} style={{ width: "48px", height: "48px", borderRadius: "10px", objectFit: "cover", flexShrink: 0, border: "1px solid var(--line)" }} />
@@ -2816,12 +2816,12 @@ function ProductDetail({
 
                         <div style={{ marginBottom: "16px" }}>
                           <strong style={{ display: "block", fontSize: "13px", marginBottom: "6px", color: "var(--text)" }}>Ponto da carne do {comboBurger}:</strong>
-                          <div className="meat-options">
+                          <div className="meat-options" style={{ display: "flex", gap: "8px" }}>
                             {["Ao ponto", "Bem passado", "Mal passado"].map((mode) => {
                               const isSelected = meat === mode;
                               return (
-                                <label key={mode} className={isSelected ? "is-selected" : ""}>
-                                  <input name="meat" type="radio" checked={isSelected} onChange={() => setMeat(mode)} />
+                                <label key={mode} className={isSelected ? "is-selected" : ""} style={{ flex: 1, textAlign: "center", padding: "10px 12px", borderRadius: "12px", border: isSelected ? "2px solid #ee8500" : "1px solid #e0e0e0", background: isSelected ? "#fff8ec" : "#fff", color: isSelected ? "#ee8500" : "#444", fontWeight: "800", fontSize: "13px", cursor: "pointer", transition: "all 0.15s ease" }}>
+                                  <input name="meat" type="radio" checked={isSelected} onChange={() => setMeat(mode)} style={{ display: "none" }} />
                                   {mode}
                                 </label>
                               );
@@ -2909,7 +2909,7 @@ function ProductDetail({
                             )}
                           </div>
 
-                          <div className="meat-options" style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                          <div className="meat-options" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: "10px" }}>
                             {(burgerProducts?.length ? burgerProducts : [
                               { id: "x-salada", name: "X-Salada", description: "Carne 90g, queijo prato e salada fresca", image: "/assets/products/x-salada-burgerc.webp", extraPrice: 0 },
                               { id: "cheeseburger", name: "Cheeseburger", description: "Carne 90g e cheddar derretido", image: "/assets/products/cheeseburger-burgerc.webp", extraPrice: 0 },
@@ -2927,7 +2927,7 @@ function ProductDetail({
                                 Duplo: "/assets/products/duplo-burgerc.webp",
                               }[b.name] || "/assets/new-direction/doutor-burger.webp";
                               return (
-                                <label key={`b2-${b.id || b.name}`} className={isSelected ? "is-selected" : ""} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", borderRadius: "14px", width: "100%", boxSizing: "border-box", gap: "12px", cursor: "pointer" }}>
+                                <label key={`b2-${b.id || b.name}`} className={isSelected ? "is-selected" : ""} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 14px", borderRadius: "14px", border: isSelected ? "2px solid #ee8500" : "1px solid #e2e8f0", background: isSelected ? "#fffdf9" : "#fff", width: "100%", boxSizing: "border-box", gap: "12px", cursor: "pointer", transition: "all 0.15s ease" }}>
                                   <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
                                     <input name="comboBurger2" type="radio" checked={isSelected} onChange={() => setComboBurger2(b.name)} />
                                     <img src={burgerImg} alt={b.name} style={{ width: "48px", height: "48px", borderRadius: "10px", objectFit: "cover", flexShrink: 0, border: "1px solid var(--line)" }} />
@@ -2952,12 +2952,12 @@ function ProductDetail({
 
                           <div style={{ marginBottom: "16px" }}>
                             <strong style={{ display: "block", fontSize: "13px", marginBottom: "6px", color: "var(--text)" }}>Ponto da carne do {comboBurger2}:</strong>
-                            <div className="meat-options">
+                            <div className="meat-options" style={{ display: "flex", gap: "8px" }}>
                               {["Ao ponto", "Bem passado", "Mal passado"].map((mode) => {
                                 const isSelected = meat2 === mode;
                                 return (
-                                  <label key={`m2-${mode}`} className={isSelected ? "is-selected" : ""}>
-                                    <input name="meat2" type="radio" checked={isSelected} onChange={() => setMeat2(mode)} />
+                                  <label key={`m2-${mode}`} className={isSelected ? "is-selected" : ""} style={{ flex: 1, textAlign: "center", padding: "10px 12px", borderRadius: "12px", border: isSelected ? "2px solid #ee8500" : "1px solid #e0e0e0", background: isSelected ? "#fff8ec" : "#fff", color: isSelected ? "#ee8500" : "#444", fontWeight: "800", fontSize: "13px", cursor: "pointer", transition: "all 0.15s ease" }}>
+                                    <input name="meat2" type="radio" checked={isSelected} onChange={() => setMeat2(mode)} style={{ display: "none" }} />
                                     {mode}
                                   </label>
                                 );
