@@ -212,7 +212,18 @@ export default function OrdersKanban({
             const colOrders = filteredOrders.filter((o) => o.status === col.statusLabel);
 
             return (
-              <div key={col.id} className="kanban-column">
+              <div
+                key={col.id}
+                className="kanban-column"
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  const orderId = e.dataTransfer.getData("text/plain");
+                  if (orderId) {
+                    onUpdateStatus(orderId, col.statusLabel, { skipConfirm: true });
+                  }
+                }}
+              >
                 <div className="column-header" style={{ borderTopColor: col.accentColor }}>
                   <div className="header-title">
                     <h3>{col.title}</h3>
@@ -231,7 +242,15 @@ export default function OrdersKanban({
                       const isSaving = savingOrderId === order.id;
 
                       return (
-                        <div key={order.id} className={`kanban-card ${delay.badgeClass} ${order.origin === "iFood" ? "card-ifood" : ""}`}>
+                        <div
+                          key={order.id}
+                          draggable
+                          onDragStart={(e) => {
+                            e.dataTransfer.setData("text/plain", order.id);
+                          }}
+                          style={{ cursor: "grab" }}
+                          className={`kanban-card ${delay.badgeClass} ${order.origin === "iFood" ? "card-ifood" : ""}`}
+                        >
                           {/* Card Header */}
                           <div className="card-top">
                             <span className="card-id">{displayId}</span>
