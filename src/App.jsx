@@ -60,6 +60,46 @@ function playNotificationSound(type = "client") {
   }
 }
 
+// Helper to calculate CRC16 CCITT for Pix EMV BR Code
+function crc16Pix(str) {
+  let crc = 0xffff;
+  for (let i = 0; i < str.length; i++) {
+    crc ^= str.charCodeAt(i) << 8;
+    for (let j = 0; j < 8; j++) {
+      if ((crc & 0x8000) !== 0) {
+        crc = ((crc << 1) ^ 0x1021) & 0xffff;
+      } else {
+        crc = (crc << 1) & 0xffff;
+      }
+    }
+  }
+  return crc.toString(16).toUpperCase().padStart(4, "0");
+}
+
+function generatePixPayload(key, merchantName, merchantCity, amount) {
+  const cleanKey = String(key || "").trim().replace(/\D/g, "") || "5583987654321";
+  const name = (merchantName || "DOUTOR BURGER").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().slice(0, 25);
+  const city = (merchantCity || "JOAO PESSOA").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().slice(0, 15);
+  const formattedAmount = Number(amount || 0).toFixed(2);
+
+  const merchantAccount = `0014BR.GOV.BCB.PIX01${String(cleanKey.length).padStart(2, "0")}${cleanKey}`;
+  const amountStr = `54${String(formattedAmount.length).padStart(2, "0")}${formattedAmount}`;
+
+  const rawPayload = 
+    `000201` +
+    `26${String(merchantAccount.length).padStart(2, "0")}${merchantAccount}` +
+    `52040000` +
+    `5303986` +
+    amountStr +
+    `5802BR` +
+    `59${String(name.length).padStart(2, "0")}${name}` +
+    `60${String(city.length).padStart(2, "0")}${city}` +
+    `62070503***` +
+    `6304`;
+
+  return rawPayload + crc16Pix(rawPayload);
+}
+
 // Check if store is open based on hours & days
 function checkStoreOpen(settings) {
   // Permitir pedidos sempre em ambiente de teste/desenvolvimento local para facilitar validações do cliente
@@ -3706,33 +3746,47 @@ function FlowDrawer({
               ))}
             </div>
 
-            {checkoutPayment === "Pix" && (
-              <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", padding: "14px", borderRadius: "14px", marginTop: "10px" }}>
-                <strong style={{ color: "#166534", fontSize: "13px", display: "block", marginBottom: "4px" }}>
-                  ⚡ Pagamento via Chave PIX
-                </strong>
-                <p style={{ fontSize: "12px", color: "#15803d", margin: "0 0 10px 0" }}>
-                  Copie a chave PIX abaixo para pagar no app do seu banco:
-                </p>
-                <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                  <code style={{ flex: 1, background: "#ffffff", padding: "8px 12px", borderRadius: "8px", border: "1px solid #bbf7d0", fontSize: "12px", fontWeight: "700", overflow: "hidden", textOverflow: "ellipsis" }}>
-                    {storeSettings.phone ? storeSettings.phone.replace(/\D/g, "") : "83987654321"}
-                  </code>
-                  <button
-                    type="button"
-                    className="primary-btn"
-                    style={{ padding: "8px 14px", fontSize: "12px", background: "#16a34a" }}
-                    onClick={() => {
-                      const key = storeSettings.phone ? storeSettings.phone.replace(/\D/g, "") : "83987654321";
-                      navigator.clipboard.writeText(key);
-                      alert("Chave PIX copiada para a área de transferência!");
-                    }}
-                  >
-                    📋 Copiar PIX
-                  </button>
+            {checkoutPayment === "Pix" && (() => {
+              const pixKey = storeSettings.phone ? storeSettings.phone.replace(/\D/g, "") : "5583987654321";
+              const currentTotal = receiveMode === "Entrega" ? total : subtotal;
+              const pixPayload = generatePixPayload(pixKey, storeSettings.name || "Doutor Burger", "Joao Pessoa", currentTotal);
+              const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(pixPayload)}`;
+
+              return (
+                <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", padding: "16px", borderRadius: "16px", marginTop: "12px", textAlign: "center" }}>
+                  <strong style={{ color: "#166534", fontSize: "14px", display: "block", marginBottom: "4px" }}>
+                    ⚡ Pagamento via PIX (Valor Exato: {money.format(currentTotal)})
+                  </strong>
+                  <p style={{ fontSize: "12px", color: "#15803d", margin: "0 0 12px 0" }}>
+                    Escaneie o QR Code abaixo ou copie a chave <strong>Copia e Cola</strong> com o valor exato no app do seu banco:
+                  </p>
+
+                  <div style={{ background: "#fff", padding: "12px", borderRadius: "16px", display: "inline-block", border: "1px solid #bbf7d0", boxShadow: "0 4px 12px rgba(22, 163, 74, 0.08)", marginBottom: "12px" }}>
+                    <img src={qrCodeUrl} alt="QR Code PIX com Valor Exato" width="180" height="180" style={{ display: "block", borderRadius: "8px" }} />
+                  </div>
+
+                  <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                    <input
+                      type="text"
+                      readOnly
+                      value={pixPayload}
+                      style={{ flex: 1, background: "#ffffff", padding: "10px 12px", borderRadius: "10px", border: "1px solid #bbf7d0", fontSize: "11px", fontWeight: "700", outline: "none", color: "#166534" }}
+                    />
+                    <button
+                      type="button"
+                      className="primary-btn"
+                      style={{ padding: "10px 16px", fontSize: "12px", background: "#16a34a", whiteSpace: "nowrap" }}
+                      onClick={() => {
+                        navigator.clipboard.writeText(pixPayload);
+                        alert("Pix Copia e Cola com o valor exato (R$ " + currentTotal.toFixed(2) + ") copiado!");
+                      }}
+                    >
+                      📋 Copiar Pix com Valor Exato
+                    </button>
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             {checkoutPayment === "Dinheiro" && (
               <div style={{ animation: "fadeIn 0.3s ease", marginTop: "10px" }}>
