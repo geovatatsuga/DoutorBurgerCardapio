@@ -295,6 +295,9 @@ export default function App() {
   const [sideSize, setSideSize] = useState("Média (P)");
   const [isAboutOpen, setIsAboutOpen] = useState(false);
   const [isFaqOpen, setIsFaqOpen] = useState(false);
+  const [isPrivacyOpen, setIsPrivacyOpen] = useState(false);
+  const [isTermsOpen, setIsTermsOpen] = useState(false);
+  const [cookieConsent, setCookieConsent] = useState(() => localStorage.getItem("doutor_cookie_consent") === "true");
 
   const toggleExtra2 = (name, price) => {
     setExtras2((prev) =>
@@ -2238,6 +2241,8 @@ _Pedido enviado via Cardápio Digital!_`;
             isStoreOpen={isStoreOpen}
             onOpenAbout={() => setIsAboutOpen(true)}
             onOpenFaq={() => setIsFaqOpen(true)}
+            onOpenPrivacy={() => setIsPrivacyOpen(true)}
+            onOpenTerms={() => setIsTermsOpen(true)}
           />
           {view === "cart" && (
             <CartPanel
@@ -2328,6 +2333,54 @@ _Pedido enviado via Cardápio Digital!_`;
       />
       <AboutModal isOpen={isAboutOpen} onClose={() => setIsAboutOpen(false)} storeSettings={storeSettings} />
       <FaqModal isOpen={isFaqOpen} onClose={() => setIsFaqOpen(false)} storeSettings={storeSettings} />
+      <PrivacyPolicyModal isOpen={isPrivacyOpen} onClose={() => setIsPrivacyOpen(false)} storeSettings={storeSettings} />
+      <TermsModal isOpen={isTermsOpen} onClose={() => setIsTermsOpen(false)} storeSettings={storeSettings} />
+
+      {!cookieConsent && (
+        <div style={{
+          position: "fixed",
+          bottom: "16px",
+          left: "16px",
+          right: "16px",
+          maxWidth: "520px",
+          margin: "0 auto",
+          background: "rgba(15, 23, 42, 0.95)",
+          backdropFilter: "blur(12px)",
+          color: "#fff",
+          padding: "16px 20px",
+          borderRadius: "20px",
+          boxShadow: "0 10px 30px rgba(0,0,0,0.3)",
+          zIndex: 99999,
+          display: "flex",
+          alignItems: "center",
+          justify: "space-between",
+          gap: "16px"
+        }}>
+          <div style={{ fontSize: "12px", lineHeight: "1.4" }}>
+            🍪 <strong>Aviso de Cookies & LGPD:</strong> Utilizamos cookies essenciais para salvar seu carrinho e melhorar sua experiência.
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              localStorage.setItem("doutor_cookie_consent", "true");
+              setCookieConsent(true);
+            }}
+            style={{
+              background: "#ee8500",
+              color: "#fff",
+              border: "none",
+              padding: "8px 16px",
+              borderRadius: "12px",
+              fontWeight: "900",
+              fontSize: "12px",
+              cursor: "pointer",
+              whiteSpace: "nowrap"
+            }}
+          >
+            Aceitar
+          </button>
+        </div>
+      )}
     </>
   );
 }
@@ -2385,7 +2438,7 @@ function Header({ count, onHome, onCart, onTrack, currentClientOrder, isStoreOpe
   );
 }
 
-function Catalog({ activeCategory, categories, filteredProducts, products, storeSettings, deliveryZones, isStoreOpen, currentFee, currentMinOrder, search, setActiveCategory, setSearch, openProduct, addQuick, onOpenAbout, onOpenFaq }) {
+function Catalog({ activeCategory, categories, filteredProducts, products, storeSettings, deliveryZones, isStoreOpen, currentFee, currentMinOrder, search, setActiveCategory, setSearch, openProduct, addQuick, onOpenAbout, onOpenFaq, onOpenPrivacy, onOpenTerms }) {
   const comboProducts = products.filter((product) => product.active && product.category === "Combos");
   return (
     <section className="catalog" id="inicio">
@@ -2415,7 +2468,7 @@ function Catalog({ activeCategory, categories, filteredProducts, products, store
           <WhyCard />
         </div>
       </section>
-      <Footer storeSettings={storeSettings} onOpenAbout={onOpenAbout} onOpenFaq={onOpenFaq} />
+      <Footer storeSettings={storeSettings} onOpenAbout={onOpenAbout} onOpenFaq={onOpenFaq} onOpenPrivacy={onOpenPrivacy} onOpenTerms={onOpenTerms} />
     </section>
   );
 }
@@ -3915,7 +3968,7 @@ function TrackOrderSearchForm({ onClose, onOrderFound }) {
   );
 }
 
-function Footer({ storeSettings, onOpenAbout, onOpenFaq }) {
+function Footer({ storeSettings, onOpenAbout, onOpenFaq, onOpenPrivacy, onOpenTerms }) {
   const whatsappNumber = storeSettings?.phone ? storeSettings.phone.replace(/\D/g, "") : "83987654321";
   const whatsappUrl = `https://wa.me/55${whatsappNumber}`;
 
@@ -3930,23 +3983,29 @@ function Footer({ storeSettings, onOpenAbout, onOpenFaq }) {
           </div>
         </div>
 
-        <nav style={{ display: "flex", gap: "20px", flexWrap: "wrap", alignItems: "center" }}>
-          <button type="button" onClick={onOpenAbout} style={{ background: "none", border: "none", color: "#68717d", fontWeight: 800, fontSize: "14px", cursor: "pointer" }}>
+        <nav style={{ display: "flex", gap: "16px", flexWrap: "wrap", alignItems: "center" }}>
+          <button type="button" onClick={onOpenAbout} style={{ background: "none", border: "none", color: "#68717d", fontWeight: 800, fontSize: "13px", cursor: "pointer" }}>
             Sobre nós
           </button>
-          <a href={whatsappUrl} target="_blank" rel="noreferrer" style={{ color: "#25D366", fontWeight: 800, fontSize: "14px", display: "flex", alignItems: "center", gap: "6px", textDecoration: "none" }}>
+          <a href={whatsappUrl} target="_blank" rel="noreferrer" style={{ color: "#25D366", fontWeight: 800, fontSize: "13px", display: "flex", alignItems: "center", gap: "6px", textDecoration: "none" }}>
             WhatsApp ({storeSettings?.phone || "(83) 98765-4321"})
           </a>
-          <button type="button" onClick={onOpenFaq} style={{ background: "none", border: "none", color: "#68717d", fontWeight: 800, fontSize: "14px", cursor: "pointer" }}>
+          <button type="button" onClick={onOpenFaq} style={{ background: "none", border: "none", color: "#68717d", fontWeight: 800, fontSize: "13px", cursor: "pointer" }}>
             Dúvidas frequentes
+          </button>
+          <button type="button" onClick={onOpenPrivacy} style={{ background: "none", border: "none", color: "#68717d", fontWeight: 800, fontSize: "13px", cursor: "pointer" }}>
+            Privacidade (LGPD)
+          </button>
+          <button type="button" onClick={onOpenTerms} style={{ background: "none", border: "none", color: "#68717d", fontWeight: 800, fontSize: "13px", cursor: "pointer" }}>
+            Termos de Uso
           </button>
         </nav>
       </div>
 
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "12px", width: "100%", fontSize: "13px", color: "#68717d" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "12px", width: "100%", fontSize: "12px", color: "#68717d" }}>
         <div>
           <strong style={{ color: "#2c3036" }}>Doutor Burger Lanchonete LTDA</strong> · CNPJ: <strong>67.929.090/0001-70</strong>
-          <span style={{ display: "block", marginTop: "2px", fontSize: "12px", color: "#8a94a0" }}>
+          <span style={{ display: "block", marginTop: "2px", fontSize: "11px", color: "#8a94a0" }}>
             {storeSettings?.address || "Rua Clotilde Torres, 116-B, Casa - Alto do Mateus, João Pessoa - PB, CEP 58090-240"}
           </span>
         </div>
@@ -4113,6 +4172,113 @@ function FaqModal({ isOpen, onClose, storeSettings }) {
 
         <button type="button" className="primary-btn full" onClick={onClose} style={{ marginTop: "24px", height: "48px", borderRadius: "14px" }}>
           Fechar Dúvidas
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function PrivacyPolicyModal({ isOpen, onClose, storeSettings }) {
+  if (!isOpen) return null;
+
+  return (
+    <div className="drawer is-open" style={{ zIndex: 9999 }}>
+      <div className="drawer-overlay" onClick={onClose} />
+      <div className="drawer-card" style={{ maxWidth: "560px", padding: "28px", borderRadius: "24px", maxHeight: "90vh", overflowY: "auto" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "20px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <Icon name="shieldCheck" />
+            <h2 style={{ fontSize: "20px", fontWeight: "900", margin: 0 }}>Política de Privacidade (LGPD)</h2>
+          </div>
+          <button type="button" className="close-btn" onClick={onClose} style={{ background: "none", border: "none", fontSize: "24px", cursor: "pointer" }}>✕</button>
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: "14px", fontSize: "13px", color: "#334155", lineHeight: 1.6 }}>
+          <p>
+            <strong>Doutor Burger Lanchonete LTDA</strong> (CNPJ: <strong>67.929.090/0001-70</strong>), localizada em {storeSettings?.address || "João Pessoa - PB"}, respeita a sua privacidade e está compromissada com a proteção dos seus dados pessoais nos termos da Lei Geral de Proteção de Dados (Lei nº 13.709/2018 - LGPD).
+          </p>
+
+          <div style={{ background: "#f8fafc", padding: "14px", borderRadius: "12px", border: "1px solid #e2e8f0" }}>
+            <strong style={{ color: "#1e293b", display: "block", marginBottom: "4px" }}>1. Coleta de Dados Pessoais</strong>
+            <p style={{ margin: 0 }}>
+              Coletamos exclusivamente os dados necessários para o processamento e entrega do seu pedido: <strong>Nome Completo</strong>, <strong>Telefone / WhatsApp</strong>, <strong>Endereço de Entrega</strong> e <strong>Forma de Pagamento</strong>.
+            </p>
+          </div>
+
+          <div style={{ background: "#f8fafc", padding: "14px", borderRadius: "12px", border: "1px solid #e2e8f0" }}>
+            <strong style={{ color: "#1e293b", display: "block", marginBottom: "4px" }}>2. Uso dos Dados & Telemetria Legítima</strong>
+            <p style={{ margin: 0 }}>
+              Seus dados são utilizados estritamente para comunicar o status do pedido via WhatsApp, organizar as rotas de entrega e emitir comprovantes fiscais. Armazenamos apenas dados essenciais via cookies e local storage para manter seu carrinho salvo.
+            </p>
+          </div>
+
+          <div style={{ background: "#f8fafc", padding: "14px", borderRadius: "12px", border: "1px solid #e2e8f0" }}>
+            <strong style={{ color: "#1e293b", display: "block", marginBottom: "4px" }}>3. Compartilhamento Seguro</strong>
+            <p style={{ margin: 0 }}>
+              Não vendemos nem compartilhamos seus dados pessoais com terceiros, exceto os dados de localização estritamente necessários para os entregadores parceiros concluírem a entrega.
+            </p>
+          </div>
+
+          <div style={{ background: "#fffdf8", padding: "14px", borderRadius: "12px", border: "1px solid #f1dec3" }}>
+            <strong style={{ color: "#ee8500", display: "block", marginBottom: "4px" }}>4. Direitos do Titular de Dados</strong>
+            <p style={{ margin: 0 }}>
+              Você pode solicitar a alteração ou exclusão definitiva do seu cadastro de clientes a qualquer momento entrando em contato direto com nosso encarregado via WhatsApp: {storeSettings?.phone || "(83) 98765-4321"}.
+            </p>
+          </div>
+        </div>
+
+        <button type="button" className="primary-btn full" onClick={onClose} style={{ marginTop: "20px", height: "46px", borderRadius: "12px" }}>
+          Entendido
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function TermsModal({ isOpen, onClose, storeSettings }) {
+  if (!isOpen) return null;
+
+  return (
+    <div className="drawer is-open" style={{ zIndex: 9999 }}>
+      <div className="drawer-overlay" onClick={onClose} />
+      <div className="drawer-card" style={{ maxWidth: "560px", padding: "28px", borderRadius: "24px", maxHeight: "90vh", overflowY: "auto" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "20px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <Icon name="document" />
+            <h2 style={{ fontSize: "20px", fontWeight: "900", margin: 0 }}>Termos de Uso do Serviço</h2>
+          </div>
+          <button type="button" className="close-btn" onClick={onClose} style={{ background: "none", border: "none", fontSize: "24px", cursor: "pointer" }}>✕</button>
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: "14px", fontSize: "13px", color: "#334155", lineHeight: 1.6 }}>
+          <p>
+            Bem-vindo ao Cardápio Digital do <strong>Doutor Burger</strong>. Ao utilizar nossa plataforma para realizar pedidos, você concorda com as seguintes condições de atendimento:
+          </p>
+
+          <div style={{ background: "#f8fafc", padding: "14px", borderRadius: "12px", border: "1px solid #e2e8f0" }}>
+            <strong style={{ color: "#1e293b", display: "block", marginBottom: "4px" }}>1. Horários de Funcionamento</strong>
+            <p style={{ margin: 0 }}>
+              Pedidos de entrega ou retirada são aceitos nos dias de funcionamento da loja ({storeSettings?.openHour || "18:00"} às {storeSettings?.closeHour || "23:30"}). Pedidos realizados fora deste horário serão processados no próximo turno de abertura.
+            </p>
+          </div>
+
+          <div style={{ background: "#f8fafc", padding: "14px", borderRadius: "12px", border: "1px solid #e2e8f0" }}>
+            <strong style={{ color: "#1e293b", display: "block", marginBottom: "4px" }}>2. Pedido Mínimo & Taxas de Entrega</strong>
+            <p style={{ margin: 0 }}>
+              O valor mínimo de compra para entregas no cardápio é R$ {money.format(storeSettings?.minOrder || 20)}. A taxa de entrega varia conforme a zona/bairro selecionado e é calculada automaticamente na tela de finalização.
+            </p>
+          </div>
+
+          <div style={{ background: "#f8fafc", padding: "14px", borderRadius: "12px", border: "1px solid #e2e8f0" }}>
+            <strong style={{ color: "#1e293b", display: "block", marginBottom: "4px" }}>3. Pagamentos na Entrega ou Retirada</strong>
+            <p style={{ margin: 0 }}>
+              O pagamento pode ser efetuado via Pix gerado na tela, cartão (crédito/débito na maquininha do motoboy) ou dinheiro (informando troco). O pedido é liberado para preparo assim que confirmado pelo atendente.
+            </p>
+          </div>
+        </div>
+
+        <button type="button" className="primary-btn full" onClick={onClose} style={{ marginTop: "20px", height: "46px", borderRadius: "12px" }}>
+          Concordar e Fechar
         </button>
       </div>
     </div>
