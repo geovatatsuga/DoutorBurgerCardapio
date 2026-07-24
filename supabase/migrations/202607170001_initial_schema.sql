@@ -662,7 +662,7 @@ grant execute on function public.place_order(uuid, public.fulfillment_type, text
 grant execute on function public.transition_order_status(uuid, public.order_status, text) to authenticated;
 
 insert into public.stores (id, slug, name, phone, address, min_order_cents, delivery_fee_cents, delivery_time_label)
-values ('11111111-1111-4111-8111-111111111111', 'doutor-burger', 'Doutor Burger', '(83) 98765-4321', 'Rua Clotilde Torres, 116-B, Casa - Alto do Mateus, Joao Pessoa - PB, CEP 58090-240', 2000, 690, '35-45 min')
+values ('11111111-1111-4111-8111-111111111111', 'doutor-burger', 'Doutor Burger', '(83) 99966-2590', 'Rua Clotilde Torres, 116-B, Casa - Alto do Mateus, Joao Pessoa - PB, CEP 58090-240', 2000, 690, '35-45 min')
 on conflict (id) do nothing;
 
 insert into public.store_hours (store_id, day_of_week, opens_at, closes_at, is_open)

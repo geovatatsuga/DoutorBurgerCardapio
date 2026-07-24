@@ -77,7 +77,7 @@ function crc16Pix(str) {
 }
 
 function generatePixPayload(key, merchantName, merchantCity, amount) {
-  const cleanKey = String(key || "").trim().replace(/\D/g, "") || "5583987654321";
+  const cleanKey = String(key || "").trim().replace(/\D/g, "") || "5583999662590";
   const name = (merchantName || "DOUTOR BURGER").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().slice(0, 25);
   const city = (merchantCity || "JOAO PESSOA").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().slice(0, 15);
   const formattedAmount = Number(amount || 0).toFixed(2);
@@ -302,7 +302,7 @@ export default function App() {
     const local = localStorage.getItem("doutor_settings");
     return local ? JSON.parse(local) : {
       name: "Doutor Burger",
-      phone: "(83) 98765-4321",
+      phone: "(83) 99966-2590",
       minOrder: 20,
       deliveryTime: "35-45 min",
       deliveryFee: 6.9,
@@ -3747,7 +3747,7 @@ function FlowDrawer({
             </div>
 
             {checkoutPayment === "Pix" && (() => {
-              const pixKey = storeSettings.phone ? storeSettings.phone.replace(/\D/g, "") : "5583987654321";
+              const pixKey = storeSettings.phone ? storeSettings.phone.replace(/\D/g, "") : "5583999662590";
               const currentTotal = receiveMode === "Entrega" ? total : subtotal;
               const pixPayload = generatePixPayload(pixKey, storeSettings.name || "Doutor Burger", "Joao Pessoa", currentTotal);
               const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(pixPayload)}`;
@@ -4118,7 +4118,7 @@ function TrackOrderSearchForm({ onClose, onOrderFound }) {
 }
 
 function Footer({ storeSettings, onOpenAbout, onOpenFaq, onOpenPrivacy, onOpenTerms }) {
-  const whatsappNumber = storeSettings?.phone ? storeSettings.phone.replace(/\D/g, "") : "83987654321";
+  const whatsappNumber = storeSettings?.phone ? storeSettings.phone.replace(/\D/g, "") : "83999662590";
   const whatsappUrl = `https://wa.me/55${whatsappNumber}`;
 
   return (
@@ -4137,7 +4137,7 @@ function Footer({ storeSettings, onOpenAbout, onOpenFaq, onOpenPrivacy, onOpenTe
             Sobre nós
           </button>
           <a href={whatsappUrl} target="_blank" rel="noreferrer" style={{ color: "#25D366", fontWeight: 800, fontSize: "13px", display: "flex", alignItems: "center", gap: "6px", textDecoration: "none" }}>
-            WhatsApp ({storeSettings?.phone || "(83) 98765-4321"})
+            WhatsApp ({storeSettings?.phone || "(83) 99966-2590"})
           </a>
           <button type="button" onClick={onOpenFaq} style={{ background: "none", border: "none", color: "#68717d", fontWeight: 800, fontSize: "13px", cursor: "pointer" }}>
             Dúvidas frequentes
@@ -4169,7 +4169,7 @@ function Footer({ storeSettings, onOpenAbout, onOpenFaq, onOpenPrivacy, onOpenTe
 
 function AboutModal({ isOpen, onClose, storeSettings }) {
   if (!isOpen) return null;
-  const whatsappNumber = storeSettings?.phone ? storeSettings.phone.replace(/\D/g, "") : "83987654321";
+  const whatsappNumber = storeSettings?.phone ? storeSettings.phone.replace(/\D/g, "") : "83999662590";
   const whatsappUrl = `https://wa.me/55${whatsappNumber}`;
 
   return (
@@ -4238,7 +4238,7 @@ function AboutModal({ isOpen, onClose, storeSettings }) {
               <div>
                 <strong style={{ display: "block", color: "#1e293b", fontSize: "14px" }}>Atendimento no WhatsApp</strong>
                 <a href={whatsappUrl} target="_blank" rel="noreferrer" style={{ color: "#25D366", fontWeight: "800", textDecoration: "none", fontSize: "14px", display: "inline-flex", alignItems: "center", gap: "4px" }}>
-                  {storeSettings?.phone || "(83) 98765-4321"} (Clique para conversar)
+                  {storeSettings?.phone || "(83) 99966-2590"} (Clique para conversar)
                 </a>
               </div>
             </div>
@@ -4280,7 +4280,7 @@ function FaqModal({ isOpen, onClose, storeSettings }) {
     },
     {
       q: "Como entrar em contato com a lanchonete?",
-      a: `Você pode entrar em contato direto pelo nosso WhatsApp ${storeSettings?.phone || "(83) 98765-4321"}. Nossa equipe está sempre pronta para te atender!`
+      a: `Você pode entrar em contato direto pelo nosso WhatsApp ${storeSettings?.phone || "(83) 99966-2590"}. Nossa equipe está sempre pronta para te atender!`
     }
   ];
 
@@ -4371,7 +4371,7 @@ function PrivacyPolicyModal({ isOpen, onClose, storeSettings }) {
           <div style={{ background: "#fffdf8", padding: "14px", borderRadius: "12px", border: "1px solid #f1dec3" }}>
             <strong style={{ color: "#ee8500", display: "block", marginBottom: "4px" }}>4. Direitos do Titular de Dados</strong>
             <p style={{ margin: 0 }}>
-              Você pode solicitar a alteração ou exclusão definitiva do seu cadastro de clientes a qualquer momento entrando em contato direto com nosso encarregado via WhatsApp: {storeSettings?.phone || "(83) 98765-4321"}.
+              Você pode solicitar a alteração ou exclusão definitiva do seu cadastro de clientes a qualquer momento entrando em contato direto com nosso encarregado via WhatsApp: {storeSettings?.phone || "(83) 99966-2590"}.
             </p>
           </div>
         </div>
