@@ -2664,9 +2664,11 @@ function ProductDetail({
   }, [product]);
 
   const [activeImgIndex, setActiveImgIndex] = useState(0);
+  const [comboStep, setComboStep] = useState(1);
 
   useEffect(() => {
     setActiveImgIndex(0);
+    setComboStep(1);
   }, [product]);
 
   const nextImage = (e) => {
@@ -2739,90 +2741,13 @@ function ProductDetail({
 
               {isCombo && (
                 <>
-                  {/* SELEÇÃO DO 1º HAMBÚRGUER DO COMBO */}
-                  <div className="detail-section combo-burger-section">
-                    <div className="detail-section-title">
-                      <h3>{isMultiBurgerCombo ? "Escolha o 1º Hambúrguer do Combo" : "Escolha o Hambúrguer do Combo"}</h3>
-                      <p>Selecione o {isMultiBurgerCombo ? "primeiro" : "principal"} burger do seu combo.</p>
-                    </div>
-                    <div className="meat-options" style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                      {(burgerProducts?.length ? burgerProducts : [
-                        { id: "x-salada", name: "X-Salada", description: "Carne 90g, queijo prato e salada fresca", image: "/assets/products/x-salada-burgerc.webp", extraPrice: 0 },
-                        { id: "cheeseburger", name: "Cheeseburger", description: "Carne 90g e cheddar derretido", image: "/assets/products/cheeseburger-burgerc.webp", extraPrice: 0 },
-                        { id: "x-bacon", name: "X-Bacon", description: "Carne 90g, cheddar e bacon crocante", image: "/assets/products/x-bacon-burgerc.webp", extraPrice: 0 },
-                        { id: "agridoce", name: "Agridoce", description: "Carne 90g, queijo coalho e abacaxi", image: "/assets/products/agridoce-burgerc.webp", extraPrice: 4 },
-                        { id: "duplo", name: "Duplo", description: "2 carnes 90g, duplo cheddar e bacon", image: "/assets/products/duplo-burgerc.webp", extraPrice: 8 },
-                      ]).map((b) => {
-                        const isSelected = comboBurger === b.name;
-                        const extraCost = b.name === "Duplo" ? 8 : b.name === "Agridoce" ? 4 : 0;
-                        const burgerImg = b.image || {
-                          "X-Salada": "/assets/products/x-salada-burgerc.webp",
-                          Cheeseburger: "/assets/products/cheeseburger-burgerc.webp",
-                          "X-Bacon": "/assets/products/x-bacon-burgerc.webp",
-                          Agridoce: "/assets/products/agridoce-burgerc.webp",
-                          Duplo: "/assets/products/duplo-burgerc.webp",
-                        }[b.name] || "/assets/new-direction/doutor-burger.webp";
-                        return (
-                          <label key={b.id || b.name} className={isSelected ? "is-selected" : ""} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", borderRadius: "14px", cursor: "pointer" }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                              <input name="comboBurger" type="radio" checked={isSelected} onChange={() => setComboBurger(b.name)} />
-                              <img src={burgerImg} alt={b.name} style={{ width: "42px", height: "42px", borderRadius: "8px", objectFit: "cover", flexShrink: 0, border: "1px solid var(--line)" }} />
-                              <div style={{ textAlign: "left" }}>
-                                <strong style={{ fontSize: "15px", display: "block" }}>{b.name}</strong>
-                                <small style={{ display: "block", color: "#68717d", fontSize: "12px", marginTop: "2px" }}>{b.description}</small>
-                              </div>
-                            </div>
-                            {extraCost > 0 && <span style={{ fontWeight: 800, color: "#ee8500", fontSize: "13px" }}>+ {money.format(extraCost)}</span>}
-                          </label>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* CUSTOMIZAÇÃO DO 1º BURGER */}
-                  <div className="detail-section meat-choice">
-                    <div className="detail-section-title">
-                      <h3>Ponto da carne {isMultiBurgerCombo ? `do 1º Burger (${comboBurger || "X-Salada"})` : "do hambúrguer"}</h3>
-                      <p>Escolha como prefere o burger.</p>
-                    </div>
-                    <div className="meat-options">
-                      {["Ao ponto", "Bem passado", "Mal passado"].map((mode) => {
-                        const isSelected = meat === mode;
-                        return (
-                          <label key={mode} className={isSelected ? "is-selected" : ""}>
-                            <input name="meat" type="radio" checked={isSelected} onChange={() => setMeat(mode)} />
-                            {mode}
-                          </label>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  <div className="detail-section removal-section">
-                    <div className="detail-section-title">
-                      <h3>Remover ingredientes {isMultiBurgerCombo ? `do 1º Burger (${comboBurger || "X-Salada"})` : ""}</h3>
-                      <p>Marque apenas o que você quer tirar do pedido.</p>
-                    </div>
-                    <div className="option-grid compact-options">
-                      {removableItems.map((ing) => {
-                        const isRemoved = removedIngredients.includes(ing);
-                        return (
-                          <label key={ing} className={isRemoved ? "is-removed" : ""}>
-                            <input type="checkbox" checked={isRemoved} onChange={() => toggleRemovedIngredient(ing)} />
-                            <span>{ing}</span>
-                          </label>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* SELEÇÃO E CUSTOMIZAÇÃO DO 2º BURGER (se for combo com 2 burgers) */}
-                  {isMultiBurgerCombo && (
+                  {/* SE FOR COMBO COM MULTIPLOS HAMBURGUERES E ESTIVER NA ETAPA 1 */}
+                  {isMultiBurgerCombo && comboStep === 1 ? (
                     <>
-                      <div className="detail-section combo-burger-section-2">
+                      <div className="detail-section combo-burger-section">
                         <div className="detail-section-title">
-                          <h3>Escolha o 2º Hambúrguer do Combo</h3>
-                          <p>Selecione o segundo burger do seu combo.</p>
+                          <h3>Escolha o 1º Hambúrguer do Combo</h3>
+                          <p>Selecione o primeiro burger do seu combo.</p>
                         </div>
                         <div className="meat-options" style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                           {(burgerProducts?.length ? burgerProducts : [
@@ -2832,7 +2757,7 @@ function ProductDetail({
                             { id: "agridoce", name: "Agridoce", description: "Carne 90g, queijo coalho e abacaxi", image: "/assets/products/agridoce-burgerc.webp", extraPrice: 4 },
                             { id: "duplo", name: "Duplo", description: "2 carnes 90g, duplo cheddar e bacon", image: "/assets/products/duplo-burgerc.webp", extraPrice: 8 },
                           ]).map((b) => {
-                            const isSelected = comboBurger2 === b.name;
+                            const isSelected = comboBurger === b.name;
                             const extraCost = b.name === "Duplo" ? 8 : b.name === "Agridoce" ? 4 : 0;
                             const burgerImg = b.image || {
                               "X-Salada": "/assets/products/x-salada-burgerc.webp",
@@ -2842,9 +2767,9 @@ function ProductDetail({
                               Duplo: "/assets/products/duplo-burgerc.webp",
                             }[b.name] || "/assets/new-direction/doutor-burger.webp";
                             return (
-                              <label key={`b2-${b.id || b.name}`} className={isSelected ? "is-selected" : ""} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", borderRadius: "14px", cursor: "pointer" }}>
+                              <label key={b.id || b.name} className={isSelected ? "is-selected" : ""} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", borderRadius: "14px", cursor: "pointer" }}>
                                 <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                                  <input name="comboBurger2" type="radio" checked={isSelected} onChange={() => setComboBurger2(b.name)} />
+                                  <input name="comboBurger" type="radio" checked={isSelected} onChange={() => setComboBurger(b.name)} />
                                   <img src={burgerImg} alt={b.name} style={{ width: "42px", height: "42px", borderRadius: "8px", objectFit: "cover", flexShrink: 0, border: "1px solid var(--line)" }} />
                                   <div style={{ textAlign: "left" }}>
                                     <strong style={{ fontSize: "15px", display: "block" }}>{b.name}</strong>
@@ -2858,17 +2783,17 @@ function ProductDetail({
                         </div>
                       </div>
 
-                      <div className="detail-section meat-choice-2">
+                      <div className="detail-section meat-choice">
                         <div className="detail-section-title">
-                          <h3>Ponto da carne do 2º Burger ({comboBurger2 || "Cheeseburger"})</h3>
-                          <p>Escolha como prefere o 2º burger.</p>
+                          <h3>Ponto da carne do 1º Burger ({comboBurger || "X-Salada"})</h3>
+                          <p>Escolha como prefere o 1º burger.</p>
                         </div>
                         <div className="meat-options">
                           {["Ao ponto", "Bem passado", "Mal passado"].map((mode) => {
-                            const isSelected = meat2 === mode;
+                            const isSelected = meat === mode;
                             return (
-                              <label key={`m2-${mode}`} className={isSelected ? "is-selected" : ""}>
-                                <input name="meat2" type="radio" checked={isSelected} onChange={() => setMeat2(mode)} />
+                              <label key={mode} className={isSelected ? "is-selected" : ""}>
+                                <input name="meat" type="radio" checked={isSelected} onChange={() => setMeat(mode)} />
                                 {mode}
                               </label>
                             );
@@ -2876,18 +2801,243 @@ function ProductDetail({
                         </div>
                       </div>
 
-                      <div className="detail-section removal-section-2">
+                      <div className="detail-section removal-section">
                         <div className="detail-section-title">
-                          <h3>Remover ingredientes do 2º Burger ({comboBurger2 || "Cheeseburger"})</h3>
-                          <p>Marque apenas o que você quer tirar do 2º burger.</p>
+                          <h3>Remover ingredientes do 1º Burger ({comboBurger || "X-Salada"})</h3>
+                          <p>Marque apenas o que você quer tirar do 1º burger.</p>
                         </div>
                         <div className="option-grid compact-options">
                           {removableItems.map((ing) => {
-                            const isRemoved = removedIngredients2.includes(ing);
+                            const isRemoved = removedIngredients.includes(ing);
                             return (
-                              <label key={`rem2-${ing}`} className={isRemoved ? "is-removed" : ""}>
-                                <input type="checkbox" checked={isRemoved} onChange={() => toggleRemovedIngredient2(ing)} />
+                              <label key={ing} className={isRemoved ? "is-removed" : ""}>
+                                <input type="checkbox" checked={isRemoved} onChange={() => toggleRemovedIngredient(ing)} />
                                 <span>{ing}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        className="primary-btn full"
+                        disabled={!comboBurger}
+                        onClick={() => setComboStep(2)}
+                        style={{ marginTop: "16px", height: "48px", borderRadius: "14px", fontSize: "15px" }}
+                      >
+                        {!comboBurger ? "Selecione o 1º Hambúrguer para Continuar" : "Próximo: Escolher 2º Hambúrguer →"}
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      {/* BANNER DE RESUMO DO 1º BURGER SE FOR MULTI-BURGER */}
+                      {isMultiBurgerCombo && (
+                        <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", padding: "12px 16px", borderRadius: "14px", marginBottom: "16px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                          <div>
+                            <strong style={{ color: "#15803d", fontSize: "14px", display: "block" }}>✓ 1º Burger Escolhido: {comboBurger || "X-Salada"} ({meat})</strong>
+                            <small style={{ color: "#166534", fontSize: "12px" }}>
+                              {removedIngredients.length ? `Sem: ${removedIngredients.join(", ")}` : "Sem remoções"}
+                            </small>
+                          </div>
+                          <button type="button" className="outline-btn" onClick={() => setComboStep(1)} style={{ fontSize: "12px", padding: "4px 10px", height: "auto", minHeight: "unset" }}>Alterar 1º Burger</button>
+                        </div>
+                      )}
+
+                      {/* SELEÇÃO DO HAMBÚRGUER (SE FOR SINGLE COMBO OU ETAPA 2 DO MULTI-COMBO) */}
+                      {!isMultiBurgerCombo && (
+                        <div className="detail-section combo-burger-section">
+                          <div className="detail-section-title">
+                            <h3>Escolha o Hambúrguer do Combo</h3>
+                            <p>Selecione o principal burger do seu combo.</p>
+                          </div>
+                          <div className="meat-options" style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                            {(burgerProducts?.length ? burgerProducts : [
+                              { id: "x-salada", name: "X-Salada", description: "Carne 90g, queijo prato e salada fresca", image: "/assets/products/x-salada-burgerc.webp", extraPrice: 0 },
+                              { id: "cheeseburger", name: "Cheeseburger", description: "Carne 90g e cheddar derretido", image: "/assets/products/cheeseburger-burgerc.webp", extraPrice: 0 },
+                              { id: "x-bacon", name: "X-Bacon", description: "Carne 90g, cheddar e bacon crocante", image: "/assets/products/x-bacon-burgerc.webp", extraPrice: 0 },
+                              { id: "agridoce", name: "Agridoce", description: "Carne 90g, queijo coalho e abacaxi", image: "/assets/products/agridoce-burgerc.webp", extraPrice: 4 },
+                              { id: "duplo", name: "Duplo", description: "2 carnes 90g, duplo cheddar e bacon", image: "/assets/products/duplo-burgerc.webp", extraPrice: 8 },
+                            ]).map((b) => {
+                              const isSelected = comboBurger === b.name;
+                              const extraCost = b.name === "Duplo" ? 8 : b.name === "Agridoce" ? 4 : 0;
+                              const burgerImg = b.image || {
+                                "X-Salada": "/assets/products/x-salada-burgerc.webp",
+                                Cheeseburger: "/assets/products/cheeseburger-burgerc.webp",
+                                "X-Bacon": "/assets/products/x-bacon-burgerc.webp",
+                                Agridoce: "/assets/products/agridoce-burgerc.webp",
+                                Duplo: "/assets/products/duplo-burgerc.webp",
+                              }[b.name] || "/assets/new-direction/doutor-burger.webp";
+                              return (
+                                <label key={b.id || b.name} className={isSelected ? "is-selected" : ""} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", borderRadius: "14px", cursor: "pointer" }}>
+                                  <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                                    <input name="comboBurger" type="radio" checked={isSelected} onChange={() => setComboBurger(b.name)} />
+                                    <img src={burgerImg} alt={b.name} style={{ width: "42px", height: "42px", borderRadius: "8px", objectFit: "cover", flexShrink: 0, border: "1px solid var(--line)" }} />
+                                    <div style={{ textAlign: "left" }}>
+                                      <strong style={{ fontSize: "15px", display: "block" }}>{b.name}</strong>
+                                      <small style={{ display: "block", color: "#68717d", fontSize: "12px", marginTop: "2px" }}>{b.description}</small>
+                                    </div>
+                                  </div>
+                                  {extraCost > 0 && <span style={{ fontWeight: 800, color: "#ee8500", fontSize: "13px" }}>+ {money.format(extraCost)}</span>}
+                                </label>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {!isMultiBurgerCombo && (
+                        <>
+                          <div className="detail-section meat-choice">
+                            <div className="detail-section-title">
+                              <h3>Ponto da carne do hambúrguer</h3>
+                              <p>Escolha como prefere o burger.</p>
+                            </div>
+                            <div className="meat-options">
+                              {["Ao ponto", "Bem passado", "Mal passado"].map((mode) => {
+                                const isSelected = meat === mode;
+                                return (
+                                  <label key={mode} className={isSelected ? "is-selected" : ""}>
+                                    <input name="meat" type="radio" checked={isSelected} onChange={() => setMeat(mode)} />
+                                    {mode}
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          <div className="detail-section removal-section">
+                            <div className="detail-section-title">
+                              <h3>Remover ingredientes do hambúrguer</h3>
+                              <p>Marque apenas o que você quer tirar do pedido.</p>
+                            </div>
+                            <div className="option-grid compact-options">
+                              {removableItems.map((ing) => {
+                                const isRemoved = removedIngredients.includes(ing);
+                                return (
+                                  <label key={ing} className={isRemoved ? "is-removed" : ""}>
+                                    <input type="checkbox" checked={isRemoved} onChange={() => toggleRemovedIngredient(ing)} />
+                                    <span>{ing}</span>
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </>
+                      )}
+
+                      {/* SELEÇÃO E CUSTOMIZAÇÃO DO 2º BURGER */}
+                      {isMultiBurgerCombo && (
+                        <>
+                          <div className="detail-section combo-burger-section-2">
+                            <div className="detail-section-title">
+                              <h3>Escolha o 2º Hambúrguer do Combo</h3>
+                              <p>Selecione o segundo burger do seu combo.</p>
+                            </div>
+                            <div className="meat-options" style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                              {(burgerProducts?.length ? burgerProducts : [
+                                { id: "x-salada", name: "X-Salada", description: "Carne 90g, queijo prato e salada fresca", image: "/assets/products/x-salada-burgerc.webp", extraPrice: 0 },
+                                { id: "cheeseburger", name: "Cheeseburger", description: "Carne 90g e cheddar derretido", image: "/assets/products/cheeseburger-burgerc.webp", extraPrice: 0 },
+                                { id: "x-bacon", name: "X-Bacon", description: "Carne 90g, cheddar e bacon crocante", image: "/assets/products/x-bacon-burgerc.webp", extraPrice: 0 },
+                                { id: "agridoce", name: "Agridoce", description: "Carne 90g, queijo coalho e abacaxi", image: "/assets/products/agridoce-burgerc.webp", extraPrice: 4 },
+                                { id: "duplo", name: "Duplo", description: "2 carnes 90g, duplo cheddar e bacon", image: "/assets/products/duplo-burgerc.webp", extraPrice: 8 },
+                              ]).map((b) => {
+                                const isSelected = comboBurger2 === b.name;
+                                const extraCost = b.name === "Duplo" ? 8 : b.name === "Agridoce" ? 4 : 0;
+                                const burgerImg = b.image || {
+                                  "X-Salada": "/assets/products/x-salada-burgerc.webp",
+                                  Cheeseburger: "/assets/products/cheeseburger-burgerc.webp",
+                                  "X-Bacon": "/assets/products/x-bacon-burgerc.webp",
+                                  Agridoce: "/assets/products/agridoce-burgerc.webp",
+                                  Duplo: "/assets/products/duplo-burgerc.webp",
+                                }[b.name] || "/assets/new-direction/doutor-burger.webp";
+                                return (
+                                  <label key={`b2-${b.id || b.name}`} className={isSelected ? "is-selected" : ""} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", borderRadius: "14px", cursor: "pointer" }}>
+                                    <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                                      <input name="comboBurger2" type="radio" checked={isSelected} onChange={() => setComboBurger2(b.name)} />
+                                      <img src={burgerImg} alt={b.name} style={{ width: "42px", height: "42px", borderRadius: "8px", objectFit: "cover", flexShrink: 0, border: "1px solid var(--line)" }} />
+                                      <div style={{ textAlign: "left" }}>
+                                        <strong style={{ fontSize: "15px", display: "block" }}>{b.name}</strong>
+                                        <small style={{ display: "block", color: "#68717d", fontSize: "12px", marginTop: "2px" }}>{b.description}</small>
+                                      </div>
+                                    </div>
+                                    {extraCost > 0 && <span style={{ fontWeight: 800, color: "#ee8500", fontSize: "13px" }}>+ {money.format(extraCost)}</span>}
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          <div className="detail-section meat-choice-2">
+                            <div className="detail-section-title">
+                              <h3>Ponto da carne do 2º Burger ({comboBurger2 || "Cheeseburger"})</h3>
+                              <p>Escolha como prefere o 2º burger.</p>
+                            </div>
+                            <div className="meat-options">
+                              {["Ao ponto", "Bem passado", "Mal passado"].map((mode) => {
+                                const isSelected = meat2 === mode;
+                                return (
+                                  <label key={`m2-${mode}`} className={isSelected ? "is-selected" : ""}>
+                                    <input name="meat2" type="radio" checked={isSelected} onChange={() => setMeat2(mode)} />
+                                    {mode}
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          </div>
+
+                          <div className="detail-section removal-section-2">
+                            <div className="detail-section-title">
+                              <h3>Remover ingredientes do 2º Burger ({comboBurger2 || "Cheeseburger"})</h3>
+                              <p>Marque apenas o que você quer tirar do 2º burger.</p>
+                            </div>
+                            <div className="option-grid compact-options">
+                              {removableItems.map((ing) => {
+                                const isRemoved = removedIngredients2.includes(ing);
+                                return (
+                                  <label key={`rem2-${ing}`} className={isRemoved ? "is-removed" : ""}>
+                                    <input type="checkbox" checked={isRemoved} onChange={() => toggleRemovedIngredient2(ing)} />
+                                    <span>{ing}</span>
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </>
+                      )}
+
+                      {/* ACOMPANHAMENTO */}
+                      <div className="detail-section combo-side-section">
+                        <div className="detail-section-title">
+                          <h3>Escolha o Acompanhamento</h3>
+                          <p>Acompanhamento incluso no seu combo.</p>
+                        </div>
+                        <div className="meat-options">
+                          {sideOptions.map((side) => {
+                            const isSelected = comboSide === side;
+                            return (
+                              <label key={side} className={isSelected ? "is-selected" : ""}>
+                                <input name="comboSide" type="radio" checked={isSelected} onChange={() => setComboSide(side)} />
+                                {side}
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* BEBIDA */}
+                      <div className="detail-section combo-drink-section">
+                        <div className="detail-section-title">
+                          <h3>Escolha a Bebida do Combo</h3>
+                          <p>Refrigerante / bebida inclusa no seu combo.</p>
+                        </div>
+                        <div className="meat-options">
+                          {drinkOptions.map((drink) => {
+                            const isSelected = comboDrink === drink;
+                            return (
+                              <label key={drink} className={isSelected ? "is-selected" : ""}>
+                                <input name="comboDrink" type="radio" checked={isSelected} onChange={() => setComboDrink(drink)} />
+                                {drink}
                               </label>
                             );
                           })}
@@ -2895,44 +3045,6 @@ function ProductDetail({
                       </div>
                     </>
                   )}
-
-                  {/* ACOMPANHAMENTO */}
-                  <div className="detail-section combo-side-section">
-                    <div className="detail-section-title">
-                      <h3>Escolha o Acompanhamento</h3>
-                      <p>Acompanhamento incluso no seu combo.</p>
-                    </div>
-                    <div className="meat-options">
-                      {sideOptions.map((side) => {
-                        const isSelected = comboSide === side;
-                        return (
-                          <label key={side} className={isSelected ? "is-selected" : ""}>
-                            <input name="comboSide" type="radio" checked={isSelected} onChange={() => setComboSide(side)} />
-                            {side}
-                          </label>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* BEBIDA */}
-                  <div className="detail-section combo-drink-section">
-                    <div className="detail-section-title">
-                      <h3>Escolha a Bebida do Combo</h3>
-                      <p>Refrigerante / bebida inclusa no seu combo.</p>
-                    </div>
-                    <div className="meat-options">
-                      {drinkOptions.map((drink) => {
-                        const isSelected = comboDrink === drink;
-                        return (
-                          <label key={drink} className={isSelected ? "is-selected" : ""}>
-                            <input name="comboDrink" type="radio" checked={isSelected} onChange={() => setComboDrink(drink)} />
-                            {drink}
-                          </label>
-                        );
-                      })}
-                    </div>
-                  </div>
                 </>
               )}
 
