@@ -1690,23 +1690,33 @@ _Pedido enviado via Cardápio Digital!_`;
                 className="outline-btn"
                 onClick={async () => {
                   if (!window.confirm("Deseja apagar TODOS os pedidos de teste do banco de dados Supabase e do navegador? Esta ação zerará a contagem para o Pedido #1.")) return;
-                  if (supabase) {
-                    try {
-                      await supabase.from("order_item_modifiers").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-                      await supabase.from("order_items").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-                      await supabase.from("payments").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-                      await supabase.from("order_status_history").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-                      await supabase.from("analytics_events").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-                      await supabase.from("orders").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-                    } catch (e) {
-                      console.error("Purge error:", e);
-                    }
-                  }
+                  
+                  // Wipe local storage first
                   localStorage.removeItem("doutor_orders");
                   localStorage.removeItem("doutor_client_order");
                   setOrders([]);
                   setCurrentClientOrder(null);
-                  alert("Todos os pedidos de teste foram apagados com sucesso! O próximo pedido será o #1.");
+
+                  if (supabase && activeStoreId) {
+                    try {
+                      // Fetch all store order IDs
+                      const { data: storeOrders } = await supabase.from("orders").select("id").eq("store_id", activeStoreId);
+                      if (storeOrders && storeOrders.length > 0) {
+                        const ids = storeOrders.map((o) => o.id);
+                        await supabase.from("order_item_modifiers").delete().in("order_item_id", 
+                          (await supabase.from("order_items").select("id").in("order_id", ids)).data?.map((i) => i.id) || []
+                        );
+                        await supabase.from("order_items").delete().in("order_id", ids);
+                        await supabase.from("payments").delete().in("order_id", ids);
+                        await supabase.from("order_status_history").delete().in("order_id", ids);
+                        await supabase.from("orders").delete().eq("store_id", activeStoreId);
+                      }
+                    } catch (e) {
+                      console.error("Purge error:", e);
+                    }
+                  }
+
+                  alert("Todos os pedidos de teste foram apagados com sucesso!");
                   window.location.reload();
                 }}
                 style={{
