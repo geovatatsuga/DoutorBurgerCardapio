@@ -1685,53 +1685,6 @@ _Pedido enviado via Cardápio Digital!_`;
               >
                 🖨️ {autoPrintEnabled ? "Impressão Auto: ATIVA" : "Impressão Auto: DESATIVADA"}
               </button>
-              <button
-                type="button"
-                className="outline-btn"
-                onClick={async () => {
-                  if (!window.confirm("Deseja apagar TODOS os pedidos de teste do banco de dados Supabase e do navegador? Esta ação zerará a contagem para o Pedido #1.")) return;
-                  
-                  localStorage.removeItem("doutor_orders");
-                  localStorage.removeItem("doutor_client_order");
-                  setOrders([]);
-                  setCurrentClientOrder(null);
-
-                  if (supabase) {
-                    try {
-                      const targetStoreId = activeStoreId || "11111111-1111-4111-8111-111111111111";
-                      const { data: storeOrders } = await supabase.from("orders").select("id").eq("store_id", targetStoreId);
-                      const ids = (storeOrders || []).map((o) => o.id);
-                      
-                      if (ids.length > 0) {
-                        const { data: itemData } = await supabase.from("order_items").select("id").in("order_id", ids);
-                        const itemIds = (itemData || []).map((i) => i.id);
-                        if (itemIds.length > 0) {
-                          await supabase.from("order_item_modifiers").delete().in("order_item_id", itemIds);
-                        }
-                        await supabase.from("order_items").delete().in("order_id", ids);
-                        await supabase.from("payments").delete().in("order_id", ids);
-                        await supabase.from("order_status_history").delete().in("order_id", ids);
-                        await supabase.from("orders").delete().in("id", ids);
-                      }
-                      await supabase.from("orders").delete().eq("store_id", targetStoreId);
-                    } catch (e) {
-                      console.error("Purge error:", e);
-                    }
-                  }
-
-                  alert("Todos os pedidos de teste foram zerados!");
-                  window.location.reload();
-                }}
-                style={{
-                  background: "#fff1f2",
-                  borderColor: "#fecdd3",
-                  color: "#e11d48",
-                  fontWeight: "800",
-                  fontSize: "12px"
-                }}
-              >
-                🗑️ Zerar Pedidos de Teste
-              </button>
               <button className="primary-btn" onClick={() => setShowCashClose(true)} style={{ background: "var(--green)", boxShadow: "none", color: "#fff" }}>
                 Fechar Caixa (Dia)
               </button>
