@@ -1685,6 +1685,40 @@ _Pedido enviado via Cardápio Digital!_`;
               >
                 🖨️ {autoPrintEnabled ? "Impressão Auto: ATIVA" : "Impressão Auto: DESATIVADA"}
               </button>
+              <button
+                type="button"
+                className="outline-btn"
+                onClick={async () => {
+                  if (!window.confirm("Deseja apagar TODOS os pedidos de teste do banco de dados Supabase e do navegador? Esta ação zerará a contagem para o Pedido #1.")) return;
+                  if (supabase) {
+                    try {
+                      await supabase.from("order_item_modifiers").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+                      await supabase.from("order_items").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+                      await supabase.from("payments").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+                      await supabase.from("order_status_history").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+                      await supabase.from("analytics_events").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+                      await supabase.from("orders").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+                    } catch (e) {
+                      console.error("Purge error:", e);
+                    }
+                  }
+                  localStorage.removeItem("doutor_orders");
+                  localStorage.removeItem("doutor_client_order");
+                  setOrders([]);
+                  setCurrentClientOrder(null);
+                  alert("Todos os pedidos de teste foram apagados com sucesso! O próximo pedido será o #1.");
+                  window.location.reload();
+                }}
+                style={{
+                  background: "#fff1f2",
+                  borderColor: "#fecdd3",
+                  color: "#e11d48",
+                  fontWeight: "800",
+                  fontSize: "12px"
+                }}
+              >
+                🗑️ Zerar Pedidos de Teste
+              </button>
               <button className="primary-btn" onClick={() => setShowCashClose(true)} style={{ background: "var(--green)", boxShadow: "none", color: "#fff" }}>
                 Fechar Caixa (Dia)
               </button>
