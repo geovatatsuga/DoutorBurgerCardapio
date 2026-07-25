@@ -1713,6 +1713,7 @@ _Pedido enviado via Cardápio Digital!_`;
           {adminTab === "history" && (
             <section className="admin-tab">
               <OrderHistory
+                orders={orders}
                 onPrintReceipt={(ord) => setReceiptOrder(ord)}
                 onUpdateStatus={updateOrderStatus}
                 savingOrderId={savingOrderId}

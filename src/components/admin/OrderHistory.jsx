@@ -5,7 +5,7 @@ import OrderDetailsModal from "./OrderDetailsModal";
 
 const money = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 
-export default function OrderHistory({ onPrintReceipt, onUpdateStatus, savingOrderId, onDuplicateOrder }) {
+export default function OrderHistory({ orders: localOrders = [], onPrintReceipt, onUpdateStatus, savingOrderId, onDuplicateOrder }) {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState(null);
@@ -72,10 +72,14 @@ export default function OrderHistory({ onPrintReceipt, onUpdateStatus, savingOrd
         maxTotal,
         limit: 300,
       });
-      setOrders(data);
+      if (data && data.length > 0) {
+        setOrders(data);
+      } else {
+        setOrders(localOrders);
+      }
     } catch (err) {
-      console.error("Error loading order history:", err);
-      setErrorMsg("Erro ao carregar histórico de pedidos: " + (err.message || err));
+      console.warn("Using local orders fallback for history:", err);
+      setOrders(localOrders);
     } finally {
       setLoading(false);
     }
