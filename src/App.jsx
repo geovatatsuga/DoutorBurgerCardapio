@@ -4013,26 +4013,27 @@ function TrackOrderTimelineView({ currentOrder, onClose }) {
               ? new Date(timelineMatch.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) 
               : (index === 0 && currentOrder.time ? currentOrder.time : null);
 
-            return (
-              <li key={step} className={isCurrent ? "current" : isDone ? "done" : ""} style={{ display: "flex", gap: "16px", marginBottom: "16px", position: "relative" }}>
-                <span className="dot" style={{ width: "28px", height: "28px", borderRadius: "50%", background: isCurrent ? "var(--accent)" : isDone ? "#34792f" : "#e9ecef", color: isCurrent || isDone ? "#fff" : "#6c757d", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold", fontSize: "12px", zIndex: 2 }}>
-                  {isDone && !isCurrent ? "✓" : index + 1}
-                </span>
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <strong style={{ fontSize: "14px", color: isCurrent ? "var(--accent-strong)" : isDone ? "#1f2026" : "#868e96", fontWeight: "800" }}>{step}</strong>
-                    {stepTime && (
-                      <span style={{ fontSize: "12px", fontWeight: "800", color: isCurrent ? "#ee8500" : isDone ? "#16a34a" : "#94a3b8", background: isCurrent ? "#fff3e0" : isDone ? "#f0fdf4" : "transparent", padding: "2px 8px", borderRadius: "6px" }}>
-                        🕒 {stepTime}
-                      </span>
-                    )}
-                  </div>
-                  <p style={{ margin: "2px 0 0 0", fontSize: "12px", color: isCurrent ? "#495057" : "#6c757d" }}>
-                    {isCurrent ? "Esta etapa está ocorrendo agora no Doutor Burger." : isDone ? `Concluído${stepTime ? ` às ${stepTime}` : "."}` : "Aguardando etapas anteriores."}
-                  </p>
-                </div>
-              </li>
-            );
+                      const isStepReached = isDone || isCurrent;
+                      return (
+                        <li key={step} className={isCurrent ? "current" : isDone ? "done" : ""} style={{ display: "flex", gap: "16px", marginBottom: "16px", position: "relative" }}>
+                          <span className="dot" style={{ width: "28px", height: "28px", borderRadius: "50%", background: isCurrent ? "var(--accent)" : isDone ? "#34792f" : "#e9ecef", color: isCurrent || isDone ? "#fff" : "#6c757d", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold", fontSize: "12px", zIndex: 2 }}>
+                            {isDone && !isCurrent ? "✓" : index + 1}
+                          </span>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                              <strong style={{ fontSize: "14px", color: isCurrent ? "var(--accent-strong)" : isDone ? "#1f2026" : "#868e96", fontWeight: "800" }}>{step}</strong>
+                              {isStepReached && stepTime && (
+                                <span style={{ fontSize: "12px", fontWeight: "800", color: isCurrent ? "#ee8500" : isDone ? "#16a34a" : "#94a3b8", background: isCurrent ? "#fff3e0" : isDone ? "#f0fdf4" : "transparent", padding: "2px 8px", borderRadius: "6px" }}>
+                                  🕒 {stepTime}
+                                </span>
+                              )}
+                            </div>
+                            <p style={{ margin: "2px 0 0 0", fontSize: "12px", color: isCurrent ? "#495057" : "#6c757d" }}>
+                              {isCurrent ? "Esta etapa está ocorrendo agora no Doutor Burger." : isDone ? `Concluído${stepTime ? ` às ${stepTime}` : "."}` : "Aguardando etapas anteriores."}
+                            </p>
+                          </div>
+                        </li>
+                      );
           })}
         </ol>
       )}
