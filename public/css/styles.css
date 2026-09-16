@@ -7555,3 +7555,274 @@ body.detail-mode .detail-copy > .purchase-bar {
     border-radius: 24px !important;
   }
 }
+
+/* ==========================================================================
+   ULTIMATE MOBILE RESPONSIVENESS & ERGONOMICS (THUMB-ZONE UX)
+   ========================================================================== */
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+@media (max-width: 760px) {
+  /* Prevent font zooming on input focus in iOS Safari */
+  input[type="text"],
+  input[type="tel"],
+  input[type="number"],
+  input[type="email"],
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+
+  /* Category tabs horizontal touch snapping */
+  .category-tabs {
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-bottom: 10px;
+    margin: 16px 0 20px 0;
+  }
+
+  .category-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .category-tabs button {
+    scroll-snap-align: start;
+    flex-shrink: 0;
+    white-space: nowrap;
+    min-height: 48px !important;
+    padding: 10px 16px !important;
+    font-size: 14px !important;
+    touch-action: manipulation;
+  }
+
+  /* Product cards feedback and touch spacing */
+  .product-card {
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    touch-action: manipulation;
+  }
+
+  .product-card:active {
+    transform: scale(0.985);
+  }
+
+  .product-card .round-btn,
+  .product-card button {
+    min-width: 44px;
+    min-height: 44px;
+    touch-action: manipulation;
+  }
+
+  /* Ultra-sleek Mobile Cart Bar */
+  .mobile-cart-bar {
+    background: rgba(37, 33, 29, 0.96) !important;
+    backdrop-filter: blur(16px) !important;
+    -webkit-backdrop-filter: blur(16px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border-radius: 16px !important;
+    transition: transform 0.15s ease, background-color 0.15s ease !important;
+  }
+
+  .mobile-cart-bar:active {
+    transform: scale(0.98) !important;
+    background: rgba(20, 17, 15, 0.98) !important;
+  }
+
+  /* Bottom navigation bar active states */
+  .bottom-nav {
+    background: rgba(255, 253, 248, 0.96) !important;
+    backdrop-filter: blur(12px) !important;
+    -webkit-backdrop-filter: blur(12px) !important;
+  }
+}
+
+/* Toast Notification Floating Banner */
+.toast-notification {
+  position: fixed;
+  bottom: 84px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1f2026;
+  color: #ffffff;
+  padding: 12px 22px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 800;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  z-index: 10000;
+  animation: toastSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  white-space: nowrap;
+}
+
+.toast-notification.success {
+  border-left: 4px solid #16a34a;
+}
+
+.toast-notification.error {
+  border-left: 4px solid #dc2626;
+}
+
+@keyframes toastSlideUp {
+  from { opacity: 0; transform: translate(-50%, 20px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+/* Admin/KDS mobile hardening */
+@media (max-width: 900px) {
+  .admin-shell {
+    display: block !important;
+    min-height: 100vh !important;
+  }
+
+  .admin-sidebar {
+    border-radius: 0 !important;
+    min-height: auto !important;
+    position: sticky !important;
+    top: 0 !important;
+    width: 100% !important;
+    z-index: 60 !important;
+  }
+
+  .admin-sidebar nav {
+    display: flex !important;
+    flex-direction: row !important;
+    gap: 8px !important;
+    overflow-x: auto !important;
+    padding-bottom: 8px !important;
+    scrollbar-width: none !important;
+  }
+
+  .admin-sidebar nav::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  .admin-sidebar nav button {
+    flex: 0 0 auto !important;
+    min-height: 44px !important;
+    white-space: nowrap !important;
+  }
+
+  .admin-sidebar nav button[style*="margin-top"] {
+    margin-top: 0 !important;
+  }
+
+  .admin-content {
+    padding: 16px !important;
+  }
+
+  .admin-header,
+  .history-header,
+  .kitchen-header {
+    align-items: stretch !important;
+    flex-direction: column !important;
+    gap: 12px !important;
+  }
+
+  .metric-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .kanban-filter-bar,
+  .history-filter-form .filter-row {
+    align-items: stretch !important;
+    flex-direction: column !important;
+  }
+
+  .kanban-filter-bar .search-group,
+  .history-filter-form .search-item {
+    min-width: 0 !important;
+    width: 100% !important;
+  }
+
+  .view-mode-toggle {
+    margin-left: 0 !important;
+    width: 100% !important;
+  }
+
+  .btn-mode {
+    flex: 1 !important;
+    min-height: 42px !important;
+  }
+
+  .kanban-board {
+    display: flex !important;
+    gap: 14px !important;
+    overflow-x: auto !important;
+    padding: 4px 2px 14px !important;
+    scroll-snap-type: x mandatory !important;
+  }
+
+  .kanban-column {
+    flex: 0 0 min(86vw, 360px) !important;
+    max-height: none !important;
+    scroll-snap-align: start !important;
+  }
+
+  .kanban-card {
+    touch-action: manipulation !important;
+  }
+
+  .history-table-wrapper {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+
+  .admin-table {
+    min-width: 760px !important;
+  }
+
+  .modal-content {
+    max-height: 92vh !important;
+    padding: 18px !important;
+    width: min(100%, 560px) !important;
+  }
+
+  .details-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .kitchen-view {
+    padding: 14px !important;
+  }
+
+  .kitchen-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 520px) {
+  .metric-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .admin-content {
+    padding: 12px !important;
+  }
+
+  .kanban-column {
+    flex-basis: 88vw !important;
+  }
+
+  .card-quick-actions {
+    flex-direction: column !important;
+  }
+
+  .btn-action,
+  .btn-action-icon {
+    min-height: 42px !important;
+    width: 100% !important;
+  }
+
+  .toast-notification {
+    bottom: 76px !important;
+    max-width: calc(100vw - 24px) !important;
+    white-space: normal !important;
+  }
+}
+

@@ -281,6 +281,18 @@ export default function App() {
   });
   const [adminTab, setAdminTab] = useState("orders");
   const [view, setView] = useState("home"); // client view: home, cart, detail
+  const [isOnline, setIsOnline] = useState(typeof navigator !== "undefined" ? navigator.onLine : true);
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
 
   // Global State
   const [products, setProducts] = useState(() => {
@@ -2277,6 +2289,11 @@ _Pedido enviado via Cardápio Digital!_`;
   // DEFAULT CLIENT PAGE
   return (
     <>
+      {!isOnline && (
+        <div role="status" aria-live="polite" style={{ background: "#dc2626", color: "#ffffff", padding: "10px 16px", textAlign: "center", fontSize: "13px", fontWeight: "800", position: "sticky", top: 0, zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}>
+          <span>🌐</span> Você está offline. Verifique sua conexão com a internet para atualizar os pedidos.
+        </div>
+      )}
       <div className="app-shell">
         <Header
           count={count}
@@ -2333,7 +2350,11 @@ _Pedido enviado via Cardápio Digital!_`;
           )}
         </main>
         {view === "home" && count > 0 && (
-          <button className="mobile-cart-bar" onClick={() => setView("cart")}>
+          <button
+            className="mobile-cart-bar"
+            aria-label={`Ver carrinho com ${count} ${count === 1 ? "item" : "itens"}, total de ${money.format(subtotal)}`}
+            onClick={() => setView("cart")}
+          >
             <span><Icon name="cart" /> {count} {count === 1 ? "item" : "itens"}</span>
             <strong>Ver carrinho · {money.format(subtotal)}</strong>
           </button>
@@ -2550,9 +2571,15 @@ function Catalog({ activeCategory, categories, filteredProducts, products, store
           <div><span className="eyebrow">Cardapio completo</span><h2>Escolha o seu pedido</h2></div>
           <label className="search"><input value={search} onChange={(event) => setSearch(event.target.value)} type="search" placeholder="Buscar no cardapio..." /></label>
         </div>
-        <div className="category-tabs">
+        <div className="category-tabs" role="tablist" aria-label="Categorias do cardápio">
           {categories.map((category) => (
-            <button key={category} className={category === activeCategory ? "is-active" : ""} onClick={() => setActiveCategory(category)}>
+            <button
+              key={category}
+              role="tab"
+              aria-selected={category === activeCategory}
+              className={category === activeCategory ? "is-active" : ""}
+              onClick={() => setActiveCategory(category)}
+            >
               <Icon name={categoryIcons[category]} /> {category}
             </button>
           ))}
@@ -2736,7 +2763,21 @@ function CartPanel({ cart, subtotal, total, receiveMode, setReceiveMode, updateQ
                 </div>
               </div>
             </article>
-          )) : <div className="notice">Seu carrinho esta vazio. Escolha um burger para comecar.</div>}
+          )) : (
+            <div className="notice" style={{ textAlign: "center", padding: "32px 16px" }}>
+              <span style={{ fontSize: "40px", display: "block", marginBottom: "8px" }}>🛒</span>
+              <strong style={{ fontSize: "16px", display: "block", color: "#1f2026" }}>Seu carrinho está vazio</strong>
+              <p style={{ fontSize: "13px", color: "#6c757d", margin: "4px 0 16px" }}>Escolha um hambúrguer saboroso para começar seu pedido!</p>
+              <button 
+                type="button" 
+                className="primary-btn" 
+                onClick={onBack}
+                style={{ padding: "10px 20px", fontSize: "13px", borderRadius: "12px" }}
+              >
+                Ver Cardápio
+              </button>
+            </div>
+          )}
         </div>
         <div className="summary">
           <h3>Resumo do pedido</h3>
@@ -3548,6 +3589,7 @@ function FlowDrawer({
   setCheckoutError,
 }) {
   const [checkoutStep, setCheckoutStep] = React.useState(1);
+  const [pixCopied, setPixCopied] = React.useState(false);
 
   React.useEffect(() => {
     if (flow === "delivery") {
@@ -3569,13 +3611,15 @@ function FlowDrawer({
 
         {/* Progress indicator */}
         {showProgress && (
-          <div className="checkout-progress" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "28px", marginTop: "10px", position: "relative" }}>
+          <div className="checkout-progress" role="navigation" aria-label="Progresso do Checkout" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "28px", marginTop: "10px", position: "relative" }}>
             <div style={{ position: "absolute", top: "18px", left: "10%", right: "10%", height: "2px", background: "#e9ecef", zIndex: 1 }} />
             <div style={{ position: "absolute", top: "18px", left: "10%", width: `${(checkoutStep - 1) * 40}%`, height: "2px", background: "var(--accent)", zIndex: 2, transition: "width 0.3s ease" }} />
             
             <div style={{ zIndex: 3, display: "flex", flexDirection: "column", alignItems: "center" }}>
               <button
                 type="button"
+                aria-label="Passo 1: Recebimento"
+                aria-current={checkoutStep === 1 ? "step" : undefined}
                 onClick={() => setCheckoutStep(1)}
                 disabled={checkoutStep < 1}
                 style={{ cursor: "pointer", width: "36px", height: "36px", borderRadius: "50%", background: checkoutStep >= 1 ? "var(--accent)" : "#fff", border: `2px solid ${checkoutStep >= 1 ? "var(--accent)" : "#dee2e6"}`, color: checkoutStep >= 1 ? "#fff" : "#6c757d", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold", fontSize: "14px", transition: "all 0.3s ease" }}
@@ -3588,6 +3632,8 @@ function FlowDrawer({
             <div style={{ zIndex: 3, display: "flex", flexDirection: "column", alignItems: "center" }}>
               <button
                 type="button"
+                aria-label="Passo 2: Pagamento"
+                aria-current={checkoutStep === 2 ? "step" : undefined}
                 onClick={() => {
                   if (receiveMode === "Entrega" && !checkoutAddress.trim()) return;
                   setCheckoutStep(2);
@@ -3603,6 +3649,8 @@ function FlowDrawer({
             <div style={{ zIndex: 3, display: "flex", flexDirection: "column", alignItems: "center" }}>
               <button
                 type="button"
+                aria-label="Passo 3: Confirmação"
+                aria-current={checkoutStep === 3 ? "step" : undefined}
                 disabled={true}
                 style={{ width: "36px", height: "36px", borderRadius: "50%", background: checkoutStep >= 3 ? "var(--accent)" : "#fff", border: `2px solid ${checkoutStep >= 3 ? "var(--accent)" : "#dee2e6"}`, color: checkoutStep >= 3 ? "#fff" : "#6c757d", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold", fontSize: "14px", transition: "all 0.3s ease" }}
               >
@@ -3622,21 +3670,23 @@ function FlowDrawer({
             <div className="choice-list checkout-choice-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", margin: "20px 0" }}>
               <button 
                 type="button"
+                aria-pressed={receiveMode === "Entrega"}
                 className={`choice ${receiveMode === "Entrega" ? "is-active" : ""}`} 
                 onClick={() => { setReceiveMode("Entrega"); setCheckoutError(""); }}
                 style={{ padding: "20px 16px", display: "flex", flexDirection: "column", alignItems: "center", gap: "8px", transition: "all 0.2s ease" }}
               >
-                <span style={{ fontSize: "28px" }}>🛵</span>
+                <span style={{ fontSize: "28px" }} aria-hidden="true">🛵</span>
                 <strong style={{ fontSize: "15px", fontWeight: "800" }}>Delivery</strong>
                 <span style={{ fontSize: "11px", color: "#6c757d", textAlign: "center" }}>Entregamos no seu endereço</span>
               </button>
               <button 
                 type="button"
+                aria-pressed={receiveMode === "Retirada"}
                 className={`choice ${receiveMode === "Retirada" ? "is-active" : ""}`} 
                 onClick={() => { setReceiveMode("Retirada"); setCheckoutError(""); }}
                 style={{ padding: "20px 16px", display: "flex", flexDirection: "column", alignItems: "center", gap: "8px", transition: "all 0.2s ease" }}
               >
-                <span style={{ fontSize: "28px" }}>🛍️</span>
+                <span style={{ fontSize: "28px" }} aria-hidden="true">🛍️</span>
                 <strong style={{ fontSize: "15px", fontWeight: "800" }}>Retirada</strong>
                 <span style={{ fontSize: "11px", color: "#6c757d", textAlign: "center" }}>Você retira no balcão (Grátis)</span>
               </button>
@@ -3647,7 +3697,7 @@ function FlowDrawer({
                 {deliveryZones.length > 0 && (
                   <label className="field" style={{ margin: 0 }}>
                     <span style={{ fontWeight: "800", fontSize: "12px", textTransform: "uppercase", color: "#495057" }}>
-                      Area de entrega
+                      Área de entrega
                     </span>
                     <select
                       value={selectedDeliveryZoneId}
@@ -3662,7 +3712,7 @@ function FlowDrawer({
                     </select>
                     {selectedDeliveryZone && (
                       <small style={{ display: "block", marginTop: "6px", color: "#6c757d", fontWeight: 700 }}>
-                        Taxa: {money.format(currentFee)} - Pedido minimo: {money.format(currentMinOrder)}
+                        Taxa: {money.format(currentFee)} - Pedido mínimo: {money.format(currentMinOrder)}
                       </small>
                     )}
                   </label>
@@ -3693,10 +3743,11 @@ function FlowDrawer({
             )}
 
             {checkoutError && (
-              <div style={{ color: "#d93838", background: "#fdf3f3", padding: "10px 14px", borderRadius: "10px", fontSize: "13px", fontWeight: "700", marginTop: "14px", border: "1px solid #fbc" }}>
+              <div role="alert" aria-live="polite" style={{ color: "#d93838", background: "#fdf3f3", padding: "10px 14px", borderRadius: "10px", fontSize: "13px", fontWeight: "700", marginTop: "14px", border: "1px solid #fbc" }}>
                 ⚠️ {checkoutError}
               </div>
             )}
+
 
             <button 
               type="button"
@@ -3776,15 +3827,21 @@ function FlowDrawer({
                     <button
                       type="button"
                       className="primary-btn"
-                      style={{ padding: "10px 16px", fontSize: "12px", background: "#16a34a", whiteSpace: "nowrap" }}
+                      style={{ padding: "10px 16px", fontSize: "12px", background: pixCopied ? "#15803d" : "#16a34a", whiteSpace: "nowrap", transition: "all 0.2s ease" }}
                       onClick={() => {
                         navigator.clipboard.writeText(pixPayload);
-                        alert("Pix Copia e Cola com o valor exato (R$ " + currentTotal.toFixed(2) + ") copiado!");
+                        setPixCopied(true);
+                        setTimeout(() => setPixCopied(false), 3000);
                       }}
                     >
-                      📋 Copiar Pix com Valor Exato
+                      {pixCopied ? "✓ PIX Copiado!" : "📋 Copiar Pix com Valor Exato"}
                     </button>
                   </div>
+                  {pixCopied && (
+                    <div role="status" aria-live="polite" style={{ marginTop: "10px", fontSize: "12px", color: "#166534", fontWeight: "800" }}>
+                      ✅ Código PIX (R$ {currentTotal.toFixed(2)}) copiado para a área de transferência!
+                    </div>
+                  )}
                 </div>
               );
             })()}
@@ -3900,7 +3957,7 @@ function FlowDrawer({
             </div>
 
             {checkoutError && (
-              <div style={{ color: "#d93838", background: "#fdf3f3", padding: "10px 14px", borderRadius: "10px", fontSize: "13px", fontWeight: "700", marginTop: "14px", border: "1px solid #fbc" }}>
+              <div role="alert" aria-live="polite" style={{ color: "#d93838", background: "#fdf3f3", padding: "10px 14px", borderRadius: "10px", fontSize: "13px", fontWeight: "700", marginTop: "14px", border: "1px solid #fbc" }}>
                 ⚠️ {checkoutError}
               </div>
             )}
