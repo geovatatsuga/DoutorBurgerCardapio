@@ -75,6 +75,9 @@ export function mapOrder(row) {
     total: centsToMoney(row.total_cents),
     status: statusFromDb[row.status] || row.status,
     time: new Date(row.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+    date: new Date(row.created_at).toLocaleDateString("pt-BR"),
+    created_at: row.created_at,
+    createdAt: row.created_at,
     origin: row.source === "ifood" ? "iFood" : "Cardapio",
   };
 }

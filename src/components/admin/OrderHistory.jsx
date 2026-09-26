@@ -253,6 +253,7 @@ export default function OrderHistory({ orders: localOrders = [], onPrintReceipt,
             <thead>
               <tr>
                 <th>Pedido</th>
+                <th>Data</th>
                 <th>Horário</th>
                 <th>Cliente</th>
                 <th>Telefone</th>
@@ -266,14 +267,24 @@ export default function OrderHistory({ orders: localOrders = [], onPrintReceipt,
             <tbody>
               {orders.map((order) => {
                 const displayId = order.displayId || `#${order.orderNumber || order.id}`;
+                const orderDate = order.date || (order.created_at || order.createdAt ? new Date(order.created_at || order.createdAt).toLocaleDateString("pt-BR") : "Hoje");
 
                 return (
                   <tr key={order.id}>
                     <td><strong>{displayId}</strong></td>
-                    <td>{order.time}</td>
+                    <td style={{ whiteSpace: "nowrap" }}>
+                      <span style={{ fontWeight: 600, color: "#1e293b", fontSize: "13px" }}>
+                        📅 {orderDate}
+                      </span>
+                    </td>
+                    <td style={{ whiteSpace: "nowrap" }}>
+                      <span style={{ color: "#64748b", fontSize: "12px", fontWeight: 600 }}>
+                        🕒 {order.time}
+                      </span>
+                    </td>
                     <td><strong>{order.name}</strong></td>
                     <td>{order.phone}</td>
-                    <td>{order.address.includes("Balcao") ? "Retirada" : "Entrega"}</td>
+                    <td>{order.address?.includes("Balcao") ? "Retirada" : "Entrega"}</td>
                     <td>{order.payment}</td>
                     <td><strong>{money.format(order.total)}</strong></td>
                     <td>
