@@ -4527,7 +4527,6 @@ function ProductDetail({
 
   const sideOptions = [
     "Batata Frita Crocante",
-    "Batata Rústica",
     "Onion Rings (+ R$ 3,00)",
     "Nuggets 6 un (+ R$ 3,00)",
   ];
