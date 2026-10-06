@@ -22,13 +22,6 @@ cross join (values
   ('Onion Rings', 'Aneis de cebola empanados e super crocantes.', 1690, '/assets/new-direction/veggie-doctor.webp', false, 40),
   ('Nuggets 6 un', 'Empanados de frango crocantes e suculentos por dentro.', 1590, '/assets/new-direction/chicken-crispy.webp', false, 50)
 ) as p(name, description, price_cents, image_path, is_favorite, sort_order)
-on conflict (store_id, name) do update
-set category_id = excluded.category_id,
-    description = excluded.description,
-    price_cents = excluded.price_cents,
-    image_path = excluded.image_path,
-    sort_order = excluded.sort_order,
-    is_active = true,
-    updated_at = now();
+on conflict (store_id, name) do nothing;
 
 commit;

@@ -26,25 +26,25 @@ with store_row as (
     ('Combo%', 'Adicionais - Combo - Burger 2', 1, 'Duplo', 800, 20),
     ('Combo%', 'Adicionais - Combo - Acompanhamento', 1, 'Onion Rings', 300, 10),
     ('Combo%', 'Adicionais - Combo - Acompanhamento', 1, 'Nuggets 6 un', 300, 20)
-), group_rows as (
+), inserted_groups as (
   insert into public.modifier_groups (store_id, name, min_select, max_select, is_required, sort_order)
   select distinct s.id, d.group_name, 0, d.max_select, false, 900
   from store_row s cross join definitions d
-  on conflict (store_id, name) do update
-    set max_select = greatest(public.modifier_groups.max_select, excluded.max_select),
-        min_select = 0,
-        is_required = false,
-        updated_at = now()
+  on conflict (store_id, name) do nothing
   returning id, store_id, name
+), group_rows as (
+  select g.id, g.store_id, g.name
+  from public.modifier_groups g
+  join store_row s on s.id = g.store_id
+  join (select distinct group_name from definitions) d on d.group_name = g.name
+  union all
+  select id, store_id, name from inserted_groups
 ), option_rows as (
   insert into public.modifier_options (group_id, name, price_cents, is_active, sort_order)
   select g.id, d.option_name, d.price_cents, true, d.sort_order
   from group_rows g
   join definitions d on d.group_name = g.name
-  on conflict (group_id, name) do update
-    set is_active = true,
-        sort_order = excluded.sort_order,
-        updated_at = now()
+  on conflict (group_id, name) do nothing
   returning group_id
 )
 insert into public.product_modifier_groups (product_id, group_id, sort_order)
