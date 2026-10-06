@@ -65,6 +65,8 @@ function playNewOrderSound(orderId) {
 export default function OrdersKanban({
   orders = [],
   onUpdateStatus,
+  onConfirmPayment,
+  canConfirmPayment,
   onPrintReceipt,
   savingOrderId,
   delayThresholds = { attention: 10, delayed: 20, critical: 30 },
@@ -446,7 +448,10 @@ export default function OrdersKanban({
       {/* Modals */}
       {selectedOrderForDetails && (
         <OrderDetailsModal
-          order={selectedOrderForDetails}
+          order={orders.find((order) => order.id === selectedOrderForDetails.id) || selectedOrderForDetails}
+          onConfirmPayment={onConfirmPayment}
+          canConfirmPayment={canConfirmPayment}
+          savingPayment={savingOrderId === selectedOrderForDetails.id}
           onClose={() => setSelectedOrderForDetails(null)}
           onPrint={onPrintReceipt}
           onSendWhatsapp={openWhatsapp}

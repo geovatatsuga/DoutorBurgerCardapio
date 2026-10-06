@@ -617,3 +617,24 @@ body.detail-mode .product-detail.is-wizard[data-wizard-stage="finish"] .wizard-n
   from { opacity: 0.5; transform: translateX(10px); }
   to { opacity: 1; transform: translateX(0); }
 }
+.checkout-payment-note {
+  color: #315d40;
+  background: #edf7ef;
+  border-left: 3px solid #438350;
+  padding: 12px 14px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.pix-after-order {
+  border-top: 1px solid #d8e2d6;
+  margin: 18px 0;
+  padding: 18px 0;
+  text-align: center;
+}
+
+.pix-after-order h3 { margin: 0 0 8px; font-size: 17px; }
+.pix-after-order p { color: #485549; font-size: 13px; line-height: 1.5; }
+.pix-after-order .pix-preview-warning { color: #8c3b16; font-weight: 700; }
+.pix-after-order img { display: block; margin: 12px auto; max-width: 100%; }
+.pix-after-order button { margin: 8px auto; display: block; max-width: 100%; }

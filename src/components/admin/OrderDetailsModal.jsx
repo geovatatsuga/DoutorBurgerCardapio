@@ -3,7 +3,7 @@ import { fetchOrderStatusTimeline } from "../../services/supabaseData";
 
 const money = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 
-export default function OrderDetailsModal({ order, onClose, onPrint, onSendWhatsapp, onCancelClick }) {
+export default function OrderDetailsModal({ order, onClose, onPrint, onSendWhatsapp, onCancelClick, onConfirmPayment, canConfirmPayment, savingPayment }) {
   const [timeline, setTimeline] = useState([]);
   const [loadingTimeline, setLoadingTimeline] = useState(false);
 
@@ -41,6 +41,12 @@ export default function OrderDetailsModal({ order, onClose, onPrint, onSendWhats
             <p><strong>Endereço:</strong> {order.address}</p>
             {order.complement && <p><strong>Complemento:</strong> {order.complement}</p>}
             <p><strong>Forma de Pagamento:</strong> {order.payment}</p>
+            <p><strong>Recebimento:</strong> {order.paymentStatus === "paid" ? "Pago e conferido" : "Pendente de conferência"}</p>
+            {canConfirmPayment && order.dbId && order.paymentStatus === "pending" && order.status !== "Cancelado" && (
+              <button className="outline-btn" type="button" disabled={savingPayment} onClick={() => onConfirmPayment(order)}>
+                {savingPayment ? "Confirmando..." : "Confirmar recebimento"}
+              </button>
+            )}
           </div>
 
           <div className="details-section">

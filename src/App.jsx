@@ -6,6 +6,9 @@ import BurgerShowcase from "./components/BurgerShowcase";
 import { uploadProductImage, fetchClientOrder } from "./services/supabaseData";
 import { resolveCatalogImage } from "./catalogImages";
 import { getRemovableIngredients } from "./removableIngredients";
+import QRCode from "qrcode";
+import { buildPixPayload, normalizePixKey } from "./pix";
+import { parseAuthoritativeOrderTotals } from "./orderTotals";
 import "./components/ProductDetail.css";
 
 const money = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
@@ -91,46 +94,6 @@ function playNotificationSound(type = "client") {
   } catch (e) {
     console.error("Audio error", e);
   }
-}
-
-// Helper to calculate CRC16 CCITT for Pix EMV BR Code
-function crc16Pix(str) {
-  let crc = 0xffff;
-  for (let i = 0; i < str.length; i++) {
-    crc ^= str.charCodeAt(i) << 8;
-    for (let j = 0; j < 8; j++) {
-      if ((crc & 0x8000) !== 0) {
-        crc = ((crc << 1) ^ 0x1021) & 0xffff;
-      } else {
-        crc = (crc << 1) & 0xffff;
-      }
-    }
-  }
-  return crc.toString(16).toUpperCase().padStart(4, "0");
-}
-
-function generatePixPayload(key, merchantName, merchantCity, amount) {
-  const cleanKey = String(key || "").trim().replace(/\D/g, "") || "5583999662590";
-  const name = (merchantName || "DOUTOR BURGER").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().slice(0, 25);
-  const city = (merchantCity || "JOAO PESSOA").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().slice(0, 15);
-  const formattedAmount = Number(amount || 0).toFixed(2);
-
-  const merchantAccount = `0014BR.GOV.BCB.PIX01${String(cleanKey.length).padStart(2, "0")}${cleanKey}`;
-  const amountStr = `54${String(formattedAmount.length).padStart(2, "0")}${formattedAmount}`;
-
-  const rawPayload = 
-    `000201` +
-    `26${String(merchantAccount.length).padStart(2, "0")}${merchantAccount}` +
-    `52040000` +
-    `5303986` +
-    amountStr +
-    `5802BR` +
-    `59${String(name.length).padStart(2, "0")}${name}` +
-    `60${String(city.length).padStart(2, "0")}${city}` +
-    `62070503***` +
-    `6304`;
-
-  return rawPayload + crc16Pix(rawPayload);
 }
 
 // Check if store is open based on hours & days
@@ -423,6 +386,8 @@ function mapProductFromDb(product) {
 }
 
 function mapOrderFromDb(order) {
+  const paymentRecord = Array.isArray(order.payments) ? order.payments[0] : order.payments;
+  const paymentMethod = order.payment_method;
   return {
     id: `#${order.order_number}`,
     dbId: order.id,
@@ -430,7 +395,8 @@ function mapOrderFromDb(order) {
     phone: order.customer_phone,
     address: order.fulfillment === "delivery" ? (order.delivery_address?.street || order.delivery_address?.address || "") : "Retirada no Balcao",
     complement: order.delivery_address?.complement || "",
-    payment: order.payment_method,
+    payment: paymentMethod === "pix" ? "Pix" : paymentMethod === "cash" ? "Dinheiro" : paymentMethod === "debit_card" ? "Cartão de Débito" : paymentMethod === "credit_card" ? "Cartão de Crédito" : "Pago pelo App (iFood)",
+    paymentStatus: paymentRecord?.status || "pending",
     items: (order.order_items || []).map((item) => ({
       name: item.product_name,
       qty: item.quantity,
@@ -494,7 +460,11 @@ export default function App() {
   const [storeSettings, setStoreSettings] = useState(() => {
     try {
       const local = localStorage.getItem("doutor_settings");
-      return local ? JSON.parse(local) : {
+      if (local) {
+        const { pixKey: _unusedPixKey, ...settings } = JSON.parse(local);
+        return settings;
+      }
+      return {
         name: "Doutor Burger",
         phone: "(83) 99966-2590",
         minOrder: 20,
@@ -680,6 +650,26 @@ export default function App() {
   const [supabaseNotice, setSupabaseNotice] = useState("");
   const [activeStoreId, setActiveStoreId] = useState(null);
   const [currentStaffRole, setCurrentStaffRole] = useState(null);
+  const [pixSettings, setPixSettings] = useState({ key: "", merchantName: "Doutor Burger", enabled: false });
+  const [pixRecipientVerified, setPixRecipientVerified] = useState(false);
+
+  useEffect(() => {
+    if (!supabase || !activeStoreId || !["owner", "admin"].includes(currentStaffRole)) return;
+    let active = true;
+    supabase.from("store_payment_settings")
+      .select("pix_key,pix_merchant_name,pix_enabled")
+      .eq("store_id", activeStoreId)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (!active || error) return;
+        setPixSettings(data ? {
+          key: data.pix_key,
+          merchantName: data.pix_merchant_name,
+          enabled: data.pix_enabled,
+        } : { key: "", merchantName: storeSettings.name, enabled: false });
+      });
+    return () => { active = false; };
+  }, [activeStoreId, currentStaffRole]);
   const [pendingOrderStatuses, setPendingOrderStatuses] = useState({});
   const [savingOrderId, setSavingOrderId] = useState("");
   const lowStockMaterials = rawMaterials.filter((item) =>
@@ -998,7 +988,7 @@ export default function App() {
     async function loadOrders() {
       const { data, error } = await supabase
         .from("orders")
-        .select("*,order_items(product_name,quantity,unit_price_cents,notes)")
+        .select("*,payments(method,status),order_items(product_name,quantity,unit_price_cents,notes)")
         .eq("store_id", activeStoreId)
         .order("created_at", { ascending: false });
 
@@ -1021,6 +1011,8 @@ export default function App() {
     loadOrders();
     loadStaff();
 
+    const refreshTimer = window.setInterval(loadOrders, 30_000);
+
     const channel = supabase
       .channel("orders-live")
       .on("postgres_changes", { event: "*", schema: "public", table: "orders", filter: `store_id=eq.${activeStoreId}` }, loadOrders)
@@ -1028,6 +1020,7 @@ export default function App() {
 
     return () => {
       supabase.removeChannel(channel);
+      window.clearInterval(refreshTimer);
     };
   }, [session, activeStoreId]);
 
@@ -1439,6 +1432,8 @@ export default function App() {
       address: receiveMode === "Entrega" ? `${checkoutAddress}${selectedDeliveryZone ? ` - ${selectedDeliveryZone.name}` : ""}` : "Retirada no Balcao",
       complement: checkoutComplement,
       payment: paymentMethod,
+      paymentStatus: "pending",
+      authoritativeTotal: false,
       items: cart.map(item => ({ name: item.name, qty: item.qty, price: item.price, notes: item.notes })),
       subtotal,
       deliveryFee: receiveMode === "Entrega" ? currentFee : 0,
@@ -1476,8 +1471,18 @@ export default function App() {
         });
         if (error) throw error;
         const rpcOrderId = createdOrder?.order_id;
-        if (!rpcOrderId) throw new Error("Não foi possível confirmar o pedido criado.");
-        newOrder = { ...newOrder, id: `#${String(rpcOrderId).slice(0, 8)}`, dbId: rpcOrderId };
+        const savedTotals = parseAuthoritativeOrderTotals(createdOrder);
+        if (!rpcOrderId || !savedTotals) throw new Error("Pedido registrado, mas o valor calculado pelo banco ainda não foi confirmado. Tente novamente.");
+        newOrder = {
+          ...newOrder,
+          ...savedTotals,
+          id: createdOrder.order_number ? `#${createdOrder.order_number}` : `#${String(rpcOrderId).slice(0, 8)}`,
+          orderNumber: createdOrder.order_number,
+          dbId: rpcOrderId,
+          authoritativeTotal: true,
+          pixKey: createdOrder.pix_key || "",
+          pixMerchantName: createdOrder.pix_merchant_name || "",
+        };
         sessionStorage.removeItem("doutor_pending_order_request");
         orderRequestKeyRef.current = null;
       } catch (error) {
@@ -1531,8 +1536,7 @@ _Pedido enviado via Cardápio Digital!_`;
     const encodedText = encodeURIComponent(message);
     const whatsappUrl = `https://wa.me/55${cleanPhone}?text=${encodedText}`;
 
-    // Open WhatsApp URL
-    window.open(whatsappUrl, "_blank");
+    if (checkoutPayment !== "Pix") window.open(whatsappUrl, "_blank");
   }
 
   // Admin Actions
@@ -1635,6 +1639,45 @@ _Pedido enviado via Cardápio Digital!_`;
         status: newStatus
       });
     }
+  }
+
+  async function confirmManualPayment(order) {
+    if (!supabase || !order?.dbId || order.paymentStatus === "paid") return;
+    if (!["owner", "admin", "manager", "cashier"].includes(currentStaffRole)) return;
+    if (!confirm(`Você conferiu o recebimento de ${money.format(order.total)} no banco ou na maquininha para o pedido ${order.displayId || order.id}? O comprovante sozinho não confirma o pagamento.`)) return;
+    setSavingOrderId(order.id);
+    const { error } = await supabase.rpc("confirm_manual_payment", { p_order_id: order.dbId });
+    setSavingOrderId("");
+    if (error) {
+      alert(`Não foi possível confirmar o pagamento: ${error.message}`);
+      return;
+    }
+    setOrders((current) => current.map((item) => item.dbId === order.dbId ? { ...item, paymentStatus: "paid" } : item));
+  }
+
+  async function savePixSettings() {
+    if (!supabase || !activeStoreId || !["owner", "admin"].includes(currentStaffRole)) return;
+    const key = normalizePixKey(pixSettings.key);
+    if (!key || !pixSettings.merchantName.trim()) {
+      alert("Informe uma chave Pix válida e o nome do recebedor.");
+      return;
+    }
+    if (pixSettings.enabled && !pixRecipientVerified) {
+      alert("Confirme primeiro no aplicativo do banco que a chave pertence à loja e que o nome do recebedor está correto.");
+      return;
+    }
+    const { error } = await supabase.from("store_payment_settings").upsert({
+      store_id: activeStoreId,
+      pix_key: key,
+      pix_merchant_name: pixSettings.merchantName.trim(),
+      pix_enabled: pixSettings.enabled,
+    });
+    if (error) {
+      alert(`Não foi possível salvar o Pix: ${error.message}`);
+      return;
+    }
+    setPixRecipientVerified(false);
+    alert("Configuração Pix salva.");
   }
 
   function cancelOrder(id) {
@@ -2516,6 +2559,8 @@ _Pedido enviado via Cardápio Digital!_`;
               <OrdersKanban
                 orders={orders}
                 onUpdateStatus={updateOrderStatus}
+                onConfirmPayment={confirmManualPayment}
+                canConfirmPayment={["owner", "admin", "manager", "cashier"].includes(currentStaffRole)}
                 onPrintReceipt={(ord) => setReceiptOrder(ord)}
                 savingOrderId={savingOrderId}
               />
@@ -2526,6 +2571,8 @@ _Pedido enviado via Cardápio Digital!_`;
             <section className="admin-tab">
               <OrderHistory
                 orders={orders}
+                onConfirmPayment={confirmManualPayment}
+                canConfirmPayment={["owner", "admin", "manager", "cashier"].includes(currentStaffRole)}
                 onPrintReceipt={(ord) => setReceiptOrder(ord)}
                 onUpdateStatus={updateOrderStatus}
                 savingOrderId={savingOrderId}
@@ -3578,6 +3625,20 @@ _Pedido enviado via Cardápio Digital!_`;
                   </label>
                   <button className="primary-btn full" type="button" onClick={saveStoreSettings}>Salvar configurações</button>
                 </article>
+                {["owner", "admin"].includes(currentStaffRole) && (
+                  <article className="settings-card">
+                    <h2>Recebimento Pix</h2>
+                    <label className="field">Chave Pix da loja
+                      <input value={pixSettings.key} onChange={(e) => setPixSettings((current) => ({ ...current, key: e.target.value.trim(), enabled: false }))} placeholder="Chave cadastrada no banco" autoComplete="off" />
+                    </label>
+                    <label className="field">Nome do recebedor
+                      <input value={pixSettings.merchantName} onChange={(e) => setPixSettings((current) => ({ ...current, merchantName: e.target.value, enabled: false }))} maxLength={25} />
+                    </label>
+                    <label className="field"><input type="checkbox" checked={pixSettings.enabled} onChange={(e) => setPixSettings((current) => ({ ...current, enabled: e.target.checked }))} /> Ativar QR Pix após criar o pedido</label>
+                    <label className="field"><input type="checkbox" checked={pixRecipientVerified} onChange={(e) => setPixRecipientVerified(e.target.checked)} /> Confirmei no aplicativo do banco que a chave pertence à loja e o recebedor está correto</label>
+                    <button className="primary-btn full" type="button" onClick={savePixSettings}>Salvar Pix</button>
+                  </article>
+                )}
                 <article className="settings-card">
                   <h2>Horário de Funcionamento</h2>
                   <label className="field">Horário de Abertura (HH:MM)
@@ -3904,6 +3965,7 @@ _Pedido enviado via Cardápio Digital!_`;
         setCheckoutChange={setCheckoutChange}
         onSubmit={submitClientOrder}
         currentOrder={currentClientOrder}
+        setCurrentOrder={setCurrentClientOrder}
         storeSettings={storeSettings}
         deliveryZones={activeDeliveryZones}
         selectedDeliveryZoneId={selectedDeliveryZoneId}
@@ -5226,6 +5288,7 @@ function FlowDrawer({
   setCheckoutChange,
   onSubmit,
   currentOrder,
+  setCurrentOrder,
   storeSettings,
   deliveryZones,
   selectedDeliveryZoneId,
@@ -5239,6 +5302,27 @@ function FlowDrawer({
 }) {
   const [checkoutStep, setCheckoutStep] = React.useState(1);
   const [pixCopied, setPixCopied] = React.useState(false);
+  const [pixQrUrl, setPixQrUrl] = React.useState("");
+  const pixPayload = React.useMemo(() => {
+    if (flow !== "success" || currentOrder?.payment !== "Pix" || !currentOrder.authoritativeTotal) return null;
+    return buildPixPayload({
+      key: currentOrder.pixKey,
+      merchantName: currentOrder.pixMerchantName,
+      merchantCity: "Joao Pessoa",
+      amountCents: currentOrder.totalCents,
+    });
+  }, [flow, currentOrder?.payment, currentOrder?.totalCents, currentOrder?.authoritativeTotal, currentOrder?.pixKey, currentOrder?.pixMerchantName]);
+
+  React.useEffect(() => {
+    let active = true;
+    setPixQrUrl("");
+    if (pixPayload) {
+      QRCode.toDataURL(pixPayload, { width: 240, margin: 2, errorCorrectionLevel: "M" })
+        .then((url) => { if (active) setPixQrUrl(url); })
+        .catch(() => { if (active) setPixQrUrl(""); });
+    }
+    return () => { active = false; };
+  }, [pixPayload]);
 
   React.useEffect(() => {
     if (flow === "delivery") {
@@ -5428,8 +5512,8 @@ function FlowDrawer({
 
             <div className="payment-grid checkout-choice-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", margin: "20px 0" }}>
               {[
-                { id: "Pix", label: "Pix", icon: "⚡", desc: "Aprovação instantânea" },
-                { id: "Cartão de Crédito", label: "Crédito", icon: "💳", desc: "Pague pelo app/maquininha" },
+                { id: "Pix", label: "Pix", icon: "⚡", desc: "Conferido pela loja" },
+                { id: "Cartão de Crédito", label: "Crédito", icon: "💳", desc: "Pague na maquininha" },
                 { id: "Cartão de Débito", label: "Débito", icon: "💳", desc: "Pague na entrega" },
                 { id: "Dinheiro", label: "Dinheiro", icon: "💵", desc: "Pague na entrega" },
               ].map((method) => (
@@ -5447,53 +5531,9 @@ function FlowDrawer({
               ))}
             </div>
 
-            {checkoutPayment === "Pix" && (() => {
-              const pixKey = storeSettings.phone ? storeSettings.phone.replace(/\D/g, "") : "5583999662590";
-              const currentTotal = receiveMode === "Entrega" ? total : subtotal;
-              const pixPayload = generatePixPayload(pixKey, storeSettings.name || "Doutor Burger", "Joao Pessoa", currentTotal);
-              const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(pixPayload)}`;
-
-              return (
-                <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", padding: "16px", borderRadius: "16px", marginTop: "12px", textAlign: "center" }}>
-                  <strong style={{ color: "#166534", fontSize: "14px", display: "block", marginBottom: "4px" }}>
-                    ⚡ Pagamento via PIX (Valor Exato: {money.format(currentTotal)})
-                  </strong>
-                  <p style={{ fontSize: "12px", color: "#15803d", margin: "0 0 12px 0" }}>
-                    Escaneie o QR Code abaixo ou copie a chave <strong>Copia e Cola</strong> com o valor exato no app do seu banco:
-                  </p>
-
-                  <div style={{ background: "#fff", padding: "12px", borderRadius: "16px", display: "inline-block", border: "1px solid #bbf7d0", boxShadow: "0 4px 12px rgba(22, 163, 74, 0.08)", marginBottom: "12px" }}>
-                    <img src={qrCodeUrl} alt="QR Code PIX com Valor Exato" width="180" height="180" style={{ display: "block", borderRadius: "8px" }} />
-                  </div>
-
-                  <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                    <input
-                      type="text"
-                      readOnly
-                      value={pixPayload}
-                      style={{ flex: 1, background: "#ffffff", padding: "10px 12px", borderRadius: "10px", border: "1px solid #bbf7d0", fontSize: "11px", fontWeight: "700", outline: "none", color: "#166534" }}
-                    />
-                    <button
-                      type="button"
-                      className="primary-btn"
-                      style={{ padding: "10px 16px", fontSize: "12px", background: pixCopied ? "#15803d" : "#16a34a", whiteSpace: "nowrap", transition: "all 0.2s ease" }}
-                      onClick={() => {
-                        navigator.clipboard.writeText(pixPayload);
-                        setPixCopied(true);
-                        setTimeout(() => setPixCopied(false), 3000);
-                      }}
-                    >
-                      {pixCopied ? "✓ PIX Copiado!" : "📋 Copiar Pix com Valor Exato"}
-                    </button>
-                  </div>
-                  {pixCopied && (
-                    <div role="status" aria-live="polite" style={{ marginTop: "10px", fontSize: "12px", color: "#166534", fontWeight: "800" }}>
-                      ✅ Código PIX (R$ {currentTotal.toFixed(2)}) copiado para a área de transferência!
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
+            {checkoutPayment === "Pix" && (
+              <p className="checkout-payment-note">O pedido será registrado primeiro. O Pix só será considerado pago após a loja conferir o recebimento.</p>
+            )}
 
             {checkoutPayment === "Dinheiro" && (
               <div style={{ animation: "fadeIn 0.3s ease", marginTop: "10px" }}>
@@ -5626,7 +5666,7 @@ function FlowDrawer({
                 onClick={onSubmit}
                 style={{ flex: 1.5, height: "52px", borderRadius: "12px", fontWeight: "bold", background: "linear-gradient(135deg, #34792f, #285e24)", border: "none", color: "#fff" }}
               >
-                Finalizar e Confirmar
+                Enviar pedido
               </button>
             </div>
           </div>
@@ -5636,18 +5676,47 @@ function FlowDrawer({
         {flow === "success" && currentOrder && (
           <div className="flow-screen is-active" style={{ textAlign: "center" }}>
             <div className="success-icon" style={{ background: "var(--green)", color: "#fff", width: "60px", height: "60px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "24px", margin: "0 auto 16px" }}>✓</div>
-            <h2>Pedido enviado!</h2>
-            <p style={{ color: "#6c757d", fontSize: "14px", marginBottom: "20px" }}>Seu pedido foi recebido e já está no painel da loja.</p>
+            <h2>Pedido recebido</h2>
+            <p style={{ color: "#6c757d", fontSize: "14px", marginBottom: "20px" }}>Seu pedido foi registrado. A loja ainda vai confirmar o pagamento.</p>
             <div className="order-number" style={{ background: "var(--bg)", padding: "14px", borderRadius: "14px", margin: "14px 0", fontWeight: "bold" }}>
               Pedido <strong>{currentOrder.id}</strong>
             </div>
+            {currentOrder.payment === "Pix" && (
+              <section className="pix-after-order" aria-label="Pagamento Pix">
+                <h3>Pix pendente de conferência</h3>
+                {pixPayload ? (
+                  <>
+                    <p>Valor do pedido: <strong>{money.format(currentOrder.total)}</strong>. No banco, confira se o recebedor é <strong>{currentOrder.pixMerchantName}</strong>. Se for diferente, não pague e fale com a loja.</p>
+                    {pixQrUrl && <img src={pixQrUrl} alt="QR Code Pix do pedido" width="220" height="220" />}
+                    <button className="outline-btn" type="button" onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(pixPayload);
+                        setPixCopied(true);
+                      } catch {
+                        setPixCopied(false);
+                      }
+                    }}>{pixCopied ? "Código copiado" : "Copiar código Pix"}</button>
+                  </>
+                ) : (
+                  <p>O Pix será apresentado pela loja na entrega ou retirada. Nenhuma chave foi publicada neste pedido.</p>
+                )}
+                <p>Depois de pagar, avise a loja e envie o comprovante pelo WhatsApp. O pedido só será marcado como pago após conferência no extrato.</p>
+                <button className="primary-btn" type="button" onClick={() => {
+                  const digits = String(storeSettings.phone || "").replace(/\D/g, "");
+                  if (!digits) return;
+                  const number = digits.startsWith("55") ? digits : `55${digits}`;
+                  const message = `Olá! Fiz o Pix do pedido ${currentOrder.id}, no valor de ${money.format(currentOrder.total)}. Vou enviar o comprovante para conferência.`;
+                  window.open(`https://wa.me/${number}?text=${encodeURIComponent(message)}`, "_blank", "noopener,noreferrer");
+                }}>Já paguei: avisar a loja</button>
+              </section>
+            )}
             <button className="primary-btn full" onClick={() => setFlow("track")} style={{ height: "52px", borderRadius: "12px", fontWeight: "bold" }}>Acompanhar pedido</button>
           </div>
         )}
 
         {flow === "track" && (
           <div className="flow-screen is-active">
-            <TrackOrderTimelineView currentOrder={currentOrder} onClose={onClose} />
+            <TrackOrderTimelineView currentOrder={currentOrder} onOrderUpdate={setCurrentOrder} onClose={onClose} />
           </div>
         )}
       </section>
@@ -5655,27 +5724,39 @@ function FlowDrawer({
   );
 }
 
-function TrackOrderTimelineView({ currentOrder, onClose }) {
-  const [clientTimeline, setClientTimeline] = React.useState([]);
+function TrackOrderTimelineView({ currentOrder, onOrderUpdate, onClose }) {
+  const [refreshError, setRefreshError] = React.useState("");
+  const orderNumber = currentOrder?.orderNumber || Number(String(currentOrder?.id || "").replace(/^#/, ""));
 
   React.useEffect(() => {
-    if (currentOrder && currentOrder.dbId && supabase) {
-      supabase
-        .rpc("get_order_status_timeline", { p_order_id: currentOrder.dbId })
-        .then(({ data }) => {
-          if (data) setClientTimeline(data);
-        })
-        .catch(() => {});
+    if (!supabase || !Number.isSafeInteger(orderNumber) || orderNumber < 1 || !currentOrder?.phone) return;
+    let active = true;
+    async function refresh() {
+      try {
+        const fresh = await fetchClientOrder(orderNumber, currentOrder.phone);
+        if (!active) return;
+        setRefreshError("");
+        onOrderUpdate((previous) => previous ? {
+          ...previous,
+          status: fresh.status,
+          paymentStatus: fresh.paymentStatus,
+          total: fresh.total,
+          totalCents: fresh.totalCents,
+          authoritativeTotal: true,
+        } : previous);
+      } catch {
+        if (active) setRefreshError("Não foi possível atualizar agora. A consulta será repetida automaticamente.");
+      }
     }
-  }, [currentOrder?.dbId, currentOrder?.status]);
+    refresh();
+    const timer = window.setInterval(refresh, 30_000);
+    return () => { active = false; window.clearInterval(timer); };
+  }, [orderNumber, currentOrder?.phone, onOrderUpdate]);
 
   if (!currentOrder) {
     return (
       <TrackOrderSearchForm onClose={onClose} onOrderFound={(ord) => {
-        if (ord) {
-          localStorage.setItem("doutor_client_order", JSON.stringify(ord));
-          window.location.reload();
-        }
+        if (ord) onOrderUpdate(ord);
       }} />
     );
   }
@@ -5695,8 +5776,11 @@ function TrackOrderTimelineView({ currentOrder, onClose }) {
       <div style={{ background: "#f8fafc", padding: "12px 16px", borderRadius: "12px", marginBottom: "16px", fontSize: "13px" }}>
         <div><strong>Cliente:</strong> {currentOrder.name}</div>
         <div><strong>Forma de Pagamento:</strong> {currentOrder.payment}</div>
+        <div><strong>Pagamento:</strong> {currentOrder.paymentStatus === "paid" ? "Recebido e conferido pela loja" : "Pendente de conferência"}</div>
         <div><strong>Total:</strong> {money.format(currentOrder.total)}</div>
       </div>
+      {refreshError && <p role="status" style={{ color: "#9a3412", fontSize: "12px" }}>{refreshError}</p>}
+      {Number.isSafeInteger(orderNumber) && orderNumber > 0 && <p style={{ color: "#66707c", fontSize: "12px" }}>Status atualizado automaticamente enquanto esta tela estiver aberta.</p>}
 
       {currentOrder.status === "Cancelado" ? (
         <div style={{ background: "#fee2e2", border: "1px solid #fca5a5", color: "#b91c1c", padding: "14px", borderRadius: "12px", margin: "16px 0", fontSize: "14px" }}>
@@ -5710,14 +5794,7 @@ function TrackOrderTimelineView({ currentOrder, onClose }) {
             const isDone = stepsList.indexOf(currentOrder.status) >= index;
             const isCurrent = currentOrder.status === step;
             
-            const timelineMatch = (clientTimeline || []).find((t) => {
-              const statusMap = { received: "Recebido", confirmed: "Confirmado", preparing: "Em preparo", ready: "Pronto", dispatched: "Saiu para entrega", completed: "Entregue" };
-              return statusMap[t.to_status] === step || t.to_status === step;
-            });
-
-            const stepTime = timelineMatch 
-              ? new Date(timelineMatch.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) 
-              : (index === 0 && currentOrder.time ? currentOrder.time : null);
+            const stepTime = index === 0 && currentOrder.time ? currentOrder.time : null;
 
                       const isStepReached = isDone || isCurrent;
                       return (
@@ -5762,22 +5839,23 @@ function TrackOrderTimelineView({ currentOrder, onClose }) {
 }
 
 function TrackOrderSearchForm({ onClose, onOrderFound }) {
-  const [searchTerm, setSearchTerm] = React.useState("");
+  const [orderNumber, setOrderNumber] = React.useState("");
+  const [phone, setPhone] = React.useState("");
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState("");
 
   const handleSearch = async (e) => {
     e.preventDefault();
-    if (!searchTerm.trim()) {
-      setError("Por favor, digite o número do pedido ou WhatsApp.");
+    if (!orderNumber.trim() || !phone.trim()) {
+      setError("Informe o número do pedido e o celular com DDD.");
       return;
     }
     setLoading(true);
     setError("");
     try {
-      const order = await fetchClientOrder(searchTerm);
+      const order = await fetchClientOrder(orderNumber, phone);
       if (!order) {
-        setError("Nenhum pedido encontrado. Verifique o número ou telefone digitado.");
+        setError("Pedido não encontrado para este número e celular.");
       } else {
         onOrderFound(order);
       }
@@ -5794,17 +5872,16 @@ function TrackOrderSearchForm({ onClose, onOrderFound }) {
       <span className="eyebrow" style={{ color: "var(--accent-strong)", fontWeight: "800", textTransform: "uppercase", fontSize: "11px", letterSpacing: "1px" }}>Consultar Pedido</span>
       <h2 style={{ fontSize: "20px", fontWeight: "900", margin: "4px 0 16px" }}>Acompanhar meu pedido</h2>
       <p style={{ fontSize: "13px", color: "var(--muted)", marginBottom: "20px" }}>
-        Informe o número do seu pedido (ex: 103) ou seu telefone cadastrado (com DDD) para acompanhar o status em tempo real.
+        Informe o número do pedido e o celular usado na compra para acompanhar o status. Não é necessário criar conta.
       </p>
 
       <form onSubmit={handleSearch} style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-        <input
-          type="text"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          placeholder="Ex: #103 ou (83) 98765-4321"
-          style={{ width: "100%", height: "52px", borderRadius: "12px", border: "1px solid var(--line)", padding: "0 16px", fontSize: "14px" }}
-        />
+        <label className="field">Número do pedido
+          <input type="text" inputMode="numeric" autoComplete="off" value={orderNumber} onChange={(e) => setOrderNumber(e.target.value)} placeholder="Ex: #103" required />
+        </label>
+        <label className="field">Celular com DDD
+          <input type="tel" inputMode="tel" autoComplete="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Ex: (83) 98765-4321" required />
+        </label>
 
         {error && (
           <div style={{ color: "#d93838", background: "#fdf3f3", padding: "10px 14px", borderRadius: "10px", fontSize: "13px", fontWeight: "700", border: "1px solid #fbc" }}>
