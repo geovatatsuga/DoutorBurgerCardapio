@@ -1,10 +1,19 @@
 import { test, expect } from "@playwright/test";
 
+const adminEmail = process.env.E2E_ADMIN_EMAIL;
+const adminPassword = process.env.E2E_ADMIN_PASSWORD;
+const hasAdminCredentials = Boolean(adminEmail && adminPassword);
+
 test.describe("Admin Operations & Kanban E2E", () => {
+  test.skip(
+    !hasAdminCredentials,
+    "Defina E2E_ADMIN_EMAIL e E2E_ADMIN_PASSWORD para executar os testes administrativos."
+  );
+
   test.beforeEach(async ({ page }) => {
     await page.goto("http://localhost:5173/#admin");
-    await page.fill('input[type="email"], input[placeholder*="email"]', "burgerc.owner@alto.com");
-    await page.fill('input[type="password"]', "BurgerC@2026");
+    await page.fill('input[type="email"], input[placeholder*="email"]', adminEmail!);
+    await page.fill('input[type="password"]', adminPassword!);
     await page.click('button[type="submit"]');
   });
 

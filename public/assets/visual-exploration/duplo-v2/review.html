@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Duplo - revisao de assets</title>
+  <style>
+    :root { font-family: Arial, sans-serif; color: #f5f4f0; background: #18191a; }
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    header { padding: 22px clamp(16px, 4vw, 48px); border-bottom: 1px solid #444; }
+    h1 { margin: 0; font-size: 22px; }
+    p { color: #bdbbb5; line-height: 1.45; }
+    main { max-width: 1400px; margin: auto; padding: 24px clamp(16px, 4vw, 48px) 64px; }
+    .comparison { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 32px; }
+    h2 { margin: 0 0 12px; font-size: 16px; }
+    .canvas { position: relative; height: 760px; overflow: hidden; background: #202122; border: 1px solid #414242; }
+    .master { display: grid; place-items: center; }
+    .master img { display: block; width: min(92%, 500px); height: auto; }
+    .layer { position: absolute; left: 50%; max-width: none; height: auto; transform: translateX(-50%); pointer-events: none; }
+    .control { display: grid; gap: 8px; margin-top: 20px; }
+    .control label { font-weight: 700; }
+    input[type="range"] { width: 100%; accent-color: #a9e5ae; }
+    .ends { display: flex; justify-content: space-between; color: #bdbbb5; font-size: 13px; }
+    .details { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; margin-top: 40px; }
+    .details figure { margin: 0; }
+    .details img { display: block; width: 100%; aspect-ratio: 3 / 2; object-fit: cover; }
+    figcaption { padding-top: 8px; font-size: 13px; color: #c8c5bd; }
+    @media (max-width: 800px) {
+      .comparison { grid-template-columns: 1fr; gap: 24px; }
+      .details { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header><h1>Duplo: revisao de proporcoes</h1></header>
+  <main>
+    <p>Comparacao de bancada. As pecas da direita sao imagens independentes; o controle mostra se a montagem e a abertura mantem a identidade do produto.</p>
+    <div class="comparison">
+      <section>
+        <h2>Produto de referencia</h2>
+        <div class="canvas master"><img src="01-duplo-master.png" alt="Duplo montado" /></div>
+      </section>
+      <section>
+        <h2>Ingredientes independentes</h2>
+        <div class="canvas" id="composition" aria-label="Composicao das sete camadas do Duplo"></div>
+      </section>
+    </div>
+    <div class="control">
+      <label for="spread">Separacao das camadas: <output id="amount">0%</output></label>
+      <input id="spread" type="range" min="0" max="100" value="0" />
+      <div class="ends"><span>Montado</span><span>Aberto</span></div>
+    </div>
+    <div class="details">
+      <figure><img src="09-macro-cheddar.png" alt="Close do cheddar sobre o blend" /><figcaption>Carne e cheddar</figcaption></figure>
+      <figure><img src="10-macro-bacon-onion.png" alt="Close do bacon e cebola caramelizada" /><figcaption>Bacon e cebola</figcaption></figure>
+    </div>
+  </main>
+  <script>
+    const layers = [
+      { file: "08-brioche-bottom-v2.png", top: 794, assembled: 520, open: 697, z: 1 },
+      { file: "03-smoked-mayo-v2.png", top: 581, assembled: 515, open: 680, z: 2 },
+      { file: "07-patty-cheddar-bottom.png", top: 566, assembled: 440, open: 598, z: 3 },
+      { file: "06-patty-cheddar-top.png", top: 447, assembled: 365, open: 482, z: 4 },
+      { file: "04-caramelized-onion.png", top: 501, assembled: 330, open: 292, z: 5 },
+      { file: "05-diced-bacon.png", top: 515, assembled: 354, open: 390, z: 6 },
+      { file: "03-smoked-mayo-v2.png", top: 581, assembled: 337, open: 184, z: 7 },
+      { file: "02-brioche-top-v2.png", top: 345, assembled: 175, open: 30, z: 8 },
+    ];
+    const composition = document.getElementById("composition");
+    const slider = document.getElementById("spread");
+    const output = document.getElementById("amount");
+    const images = layers.map((layer) => {
+      const img = document.createElement("img");
+      img.src = layer.file;
+      img.alt = "";
+      img.className = "layer";
+      img.style.zIndex = layer.z;
+      composition.append(img);
+      return img;
+    });
+    function layout() {
+      const width = Math.min(composition.clientWidth, 460);
+      const responsiveScale = width / 460;
+      const progress = Number(slider.value) / 100;
+      const ingredientScale = 1 - progress * 0.35;
+      const imageWidth = width * ingredientScale;
+      const stageHeight = 850 * responsiveScale;
+      composition.style.height = `${stageHeight}px`;
+      document.querySelector(".master").style.height = `${stageHeight}px`;
+      output.value = `${slider.value}%`;
+      layers.forEach((layer, index) => {
+        const visibleTop = layer.assembled + (layer.open - layer.assembled) * progress;
+        images[index].style.width = `${imageWidth}px`;
+        images[index].style.top = `${visibleTop * responsiveScale - layer.top * imageWidth / 1254}px`;
+      });
+    }
+    slider.addEventListener("input", layout);
+    new ResizeObserver(layout).observe(composition);
+    layout();
+  </script>
+</body>
+</html>

@@ -72,6 +72,7 @@ export default function OrdersKanban({
   const [searchTerm, setSearchTerm] = useState("");
   const [fulfillmentFilter, setFulfillmentFilter] = useState("all");
   const [paymentFilter, setPaymentFilter] = useState("all");
+  const [dateFilter, setDateFilter] = useState("today"); // "today" | "all" | "yesterday"
   const [viewMode, setViewMode] = useState("kanban"); // "kanban" | "list"
 
   const [selectedOrderForDetails, setSelectedOrderForDetails] = useState(null);
@@ -96,8 +97,22 @@ export default function OrdersKanban({
 
   // Filtered orders list
   const filteredOrders = useMemo(() => {
+    const todayStr = new Date().toLocaleDateString("pt-BR");
+    const yesterdayDate = new Date();
+    yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+    const yesterdayStr = yesterdayDate.toLocaleDateString("pt-BR");
+
     return orders.filter((order) => {
       if (order.status === "Cancelado") return false; // Cancelled are viewed in History or toggle
+
+      // Date filter
+      if (dateFilter === "today") {
+        const orderDate = order.date || (order.created_at ? new Date(order.created_at).toLocaleDateString("pt-BR") : "");
+        if (orderDate && orderDate !== todayStr) return false;
+      } else if (dateFilter === "yesterday") {
+        const orderDate = order.date || (order.created_at ? new Date(order.created_at).toLocaleDateString("pt-BR") : "");
+        if (orderDate && orderDate !== yesterdayStr) return false;
+      }
 
       if (searchTerm) {
         const term = searchTerm.toLowerCase().trim();
@@ -116,12 +131,12 @@ export default function OrdersKanban({
       if (paymentFilter !== "all") {
         if (paymentFilter === "pix" && order.payment !== "Pix") return false;
         if (paymentFilter === "cash" && order.payment !== "Dinheiro") return false;
-        if (paymentFilter === "card" && !order.payment.includes("Cartao") && !order.payment.includes("Cart\u00e3o")) return false;
+        if (paymentFilter === "card" && !order.payment.includes("Cartao") && !order.payment.includes("Cartão")) return false;
       }
 
       return true;
     });
-  }, [orders, searchTerm, fulfillmentFilter, paymentFilter]);
+  }, [orders, searchTerm, fulfillmentFilter, paymentFilter, dateFilter]);
 
   const handleCancelConfirm = (orderId, reason) => {
     onUpdateStatus(orderId, "Cancelado", { reason, skipConfirm: true });
@@ -166,6 +181,15 @@ export default function OrdersKanban({
             onChange={(e) => setSearchTerm(e.target.value)}
             className="filter-input"
           />
+        </div>
+
+        <div className="filter-group">
+          <label>Data:</label>
+          <select value={dateFilter} onChange={(e) => setDateFilter(e.target.value)} className="filter-select">
+            <option value="today">📅 Pedidos de Hoje</option>
+            <option value="yesterday">Ontem</option>
+            <option value="all">Todos os Pedidos</option>
+          </select>
         </div>
 
         <div className="filter-group">
@@ -253,7 +277,12 @@ export default function OrdersKanban({
                         >
                           {/* Card Header */}
                           <div className="card-top">
-                            <span className="card-id">{displayId}</span>
+                            <div>
+                              <span className="card-id">{displayId}</span>
+                              <span style={{ marginLeft: "6px", fontSize: "11px", color: "#64748b", fontWeight: 600 }}>
+                                🕒 {order.time}{order.date && order.date !== new Date().toLocaleDateString("pt-BR") ? ` (${order.date})` : ""}
+                              </span>
+                            </div>
                             <span className={`timer-badge ${delay.badgeClass}`}>
                               ⏱️ {elapsed} min
                             </span>

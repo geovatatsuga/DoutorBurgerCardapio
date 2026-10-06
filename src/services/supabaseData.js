@@ -1,5 +1,7 @@
 import { isSupabaseConfigured, supabase } from "../lib/supabase";
 
+import { resolveCatalogImage } from "../catalogImages";
+
 export const STORE_ID = "11111111-1111-4111-8111-111111111111";
 
 const statusFromDb = {
@@ -16,8 +18,8 @@ const statusToDb = Object.fromEntries(Object.entries(statusFromDb).map(([key, va
 
 const paymentToDb = {
   Pix: "pix",
-  "Cartao de Credito": "credit_card",
-  "Cartao de Debito": "debit_card",
+  "Cartão de Crédito": "credit_card",
+  "Cartão de Débito": "debit_card",
   "Cartao de Credito": "credit_card",
   "Cartao de Debito": "debit_card",
   Dinheiro: "cash",
@@ -46,7 +48,7 @@ export function mapProduct(row) {
     name: row.name,
     description: row.description,
     price: centsToMoney(row.price_cents),
-    image: row.image_path || "/assets/new-direction/doutor-burger.webp",
+    image: resolveCatalogImage(row.name, row.image_path),
     active: row.is_active,
     isFavorite: row.is_favorite,
     isCombo: row.is_combo,
@@ -75,6 +77,9 @@ export function mapOrder(row) {
     total: centsToMoney(row.total_cents),
     status: statusFromDb[row.status] || row.status,
     time: new Date(row.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+    date: new Date(row.created_at).toLocaleDateString("pt-BR"),
+    created_at: row.created_at,
+    createdAt: row.created_at,
     origin: row.source === "ifood" ? "iFood" : "Cardapio",
   };
 }
@@ -166,18 +171,20 @@ export async function placeOrder({ receiveMode, customerName, customerPhone, add
         }
       : null;
 
-  const { data, error } = await client.rpc("place_order", {
-    p_store_id: STORE_ID,
-    p_fulfillment: receiveMode === "Entrega" ? "delivery" : "pickup",
-    p_customer_name: customerName,
-    p_customer_phone: customerPhone,
-    p_delivery_address: deliveryAddress,
-    p_payment_method: paymentToDb[paymentMethod] || "pix",
-    p_items: items,
-    p_notes: notes || null,
+  const { data, error } = await client.functions.invoke("place-order", {
+    body: {
+      p_store_id: STORE_ID,
+      p_fulfillment: receiveMode === "Entrega" ? "delivery" : "pickup",
+      p_customer_name: customerName,
+      p_customer_phone: customerPhone,
+      p_delivery_address: deliveryAddress,
+      p_payment_method: paymentToDb[paymentMethod] || "pix",
+      p_items: items,
+      p_notes: notes || null,
+    },
   });
   if (error) throw error;
-  return data;
+  return data.order_id;
 }
 
 export async function transitionOrderStatus(orderId, nextStatus, reason) {
@@ -296,7 +303,7 @@ export async function uploadProductImage(rawFile) {
   const file = await convertImageToWebP(rawFile);
 
   const fileName = `prod_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.webp`;
-  const filePath = `${fileName}`;
+  const filePath = `${STORE_ID}/${fileName}`;
 
   let bucketName = "Images";
   let { error: uploadError } = await client.storage
