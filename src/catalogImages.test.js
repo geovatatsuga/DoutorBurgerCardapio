@@ -28,4 +28,14 @@ describe("resolveCatalogImage", () => {
     expect(resolveCatalogImage("Coca-Cola", "/assets/products/coca-cola.webp"))
       .toBe("/assets/products/coca-cola.webp");
   });
+
+  it.each([
+    ["Batata Simples", "/assets/new-direction/batata-cheddar-bacon.webp", "/assets/products/batata-simples-wide.webp"],
+    ["Batata Cheddar & Bacon", "/assets/new-direction/batata-cheddar-bacon.webp", "/assets/products/batata-cheddar-bacon-wide.webp"],
+    ["Onion Rings", "/assets/new-direction/veggie-doctor.webp", "/assets/products/onion-rings-wide.webp"],
+    ["Nuggets 6 un", "/assets/new-direction/chicken-crispy.webp", "/assets/products/nuggets-wide.webp"],
+  ])("maps the temporary photo for %s", (name, oldImage, newImage) => {
+    expect(resolveCatalogImage(name, oldImage)).toBe(newImage);
+    expect(resolveCatalogImage(name, "https://example.com/custom.webp")).toBe("https://example.com/custom.webp");
+  });
 });
