@@ -56,7 +56,8 @@ export function mapProduct(row) {
 }
 
 export function mapOrder(row) {
-  const payment = row.payments?.[0]?.method || row.payment_method;
+  const paymentRecord = Array.isArray(row.payments) ? row.payments[0] : row.payments;
+  const payment = paymentRecord?.method || row.payment_method;
   return {
     id: row.id,
     orderNumber: row.order_number,
@@ -66,6 +67,7 @@ export function mapOrder(row) {
     address: row.fulfillment === "pickup" ? "Retirada no Balcao" : row.delivery_address?.street || row.delivery_address?.address || "",
     complement: row.delivery_address?.complement || "",
     payment: payment === "pix" ? "Pix" : payment === "cash" ? "Dinheiro" : payment === "ifood" ? "Pago pelo App (iFood)" : "Cartao",
+    paymentStatus: paymentRecord?.status || "pending",
     items: (row.order_items || []).map((item) => ({
       name: item.product_name,
       qty: item.quantity,
@@ -395,32 +397,39 @@ export async function loadOrderHistory(filters = {}) {
   return mapped;
 }
 
-export async function fetchClientOrder(searchTerm) {
+export async function fetchClientOrder(orderNumber, phone) {
   const client = requireSupabase();
-  if (!searchTerm) return null;
-  const term = String(searchTerm).trim().replace("#", "");
-
-  let query = client
-    .from("orders")
-    .select("*, payments(method,status), order_items(product_name, quantity, unit_price_cents, notes)")
-    .eq("store_id", STORE_ID)
-    .order("created_at", { ascending: false });
-
-  if (/^\d+$/.test(term) && term.length < 9) {
-    query = query.eq("order_number", parseInt(term, 10));
-  } else {
-    const cleanPhone = term.replace(/\D/g, "");
-    if (cleanPhone.length >= 8) {
-      query = query.ilike("customer_phone", `%${cleanPhone}%`);
-    } else {
-      query = query.eq("id", term);
-    }
+  const number = String(orderNumber || "").trim().replace(/^#/, "");
+  const cleanPhone = String(phone || "").replace(/\D/g, "");
+  if (!/^\d{1,15}$/.test(number) || !/^(?:55)?\d{10,11}$/.test(cleanPhone)) {
+    throw new Error("Informe o número do pedido e o celular com DDD.");
   }
-
-  const { data, error } = await query.limit(1);
-  if (error) throw error;
-  if (!data || data.length === 0) return null;
-  return mapOrder(data[0]);
+  const { data, error } = await client.functions.invoke("track-order", {
+    body: { order_number: Number(number), phone: cleanPhone },
+  });
+  if (error) {
+    let message = error.message;
+    try { message = (await error.context?.json())?.error || message; } catch { /* Network errors have no JSON body. */ }
+    throw new Error(message);
+  }
+  if (!data || data.order_number !== Number(number) || !Number.isSafeInteger(data.total_cents)) {
+    throw new Error("Resposta inválida ao consultar o pedido.");
+  }
+  const method = data.payment_method;
+  return {
+    id: `#${data.order_number}`,
+    orderNumber: data.order_number,
+    displayId: `#${data.order_number}`,
+    phone: cleanPhone,
+    name: "Cliente",
+    payment: method === "pix" ? "Pix" : method === "cash" ? "Dinheiro" : method === "debit_card" ? "Cartão de Débito" : "Cartão de Crédito",
+    paymentStatus: data.payment_status,
+    total: centsToMoney(data.total_cents),
+    totalCents: data.total_cents,
+    authoritativeTotal: true,
+    status: statusFromDb[data.status] || data.status,
+    updatedAt: data.updated_at,
+  };
 }
 
 

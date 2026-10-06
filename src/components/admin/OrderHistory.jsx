@@ -5,7 +5,7 @@ import OrderDetailsModal from "./OrderDetailsModal";
 
 const money = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 
-export default function OrderHistory({ orders: localOrders = [], onPrintReceipt, onUpdateStatus, savingOrderId, onDuplicateOrder }) {
+export default function OrderHistory({ orders: localOrders = [], onPrintReceipt, onUpdateStatus, onConfirmPayment, canConfirmPayment, savingOrderId, onDuplicateOrder }) {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState(null);
@@ -326,7 +326,10 @@ export default function OrderHistory({ orders: localOrders = [], onPrintReceipt,
       {/* Modals */}
       {selectedOrderDetails && (
         <OrderDetailsModal
-          order={selectedOrderDetails}
+          order={localOrders.find((order) => order.dbId === selectedOrderDetails.dbId) || selectedOrderDetails}
+          onConfirmPayment={onConfirmPayment}
+          canConfirmPayment={canConfirmPayment}
+          savingPayment={savingOrderId === selectedOrderDetails.id}
           onClose={() => setSelectedOrderDetails(null)}
           onPrint={onPrintReceipt}
           onSendWhatsapp={openWhatsapp}

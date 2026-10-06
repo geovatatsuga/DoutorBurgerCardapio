@@ -74,6 +74,9 @@ sql_paths = []
 [functions.place-order]
 verify_jwt = false
 
+[functions.track-order]
+verify_jwt = false
+
 [db.network_restrictions]
 # Enable management of network restrictions.
 enabled = false

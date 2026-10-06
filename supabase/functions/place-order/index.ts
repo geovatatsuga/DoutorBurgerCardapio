@@ -8,6 +8,8 @@ const allowedOrigins = new Set([
   "http://127.0.0.1:5175",
   "http://localhost:4173",
   "http://127.0.0.1:4173",
+  "http://localhost:4182",
+  "http://127.0.0.1:4182",
 ]);
 
 function corsHeaders(origin: string | null) {
@@ -173,5 +175,40 @@ Deno.serve(async (request) => {
     return json({ error: "Não foi possível criar o pedido. Confira os itens, adicionais e endereço." }, 400, origin);
   }
 
-  return json({ order_id: orderId }, 201, origin);
+  const { data: savedOrder, error: readError } = await admin
+    .from("orders")
+    .select("id,store_id,request_key,order_number,subtotal_cents,delivery_fee_cents,total_cents")
+    .eq("id", orderId)
+    .eq("store_id", payload.p_store_id)
+    .eq("request_key", payload.p_request_key)
+    .single();
+  if (readError || !savedOrder || !Number.isSafeInteger(savedOrder.total_cents) || savedOrder.total_cents < 0) {
+    console.error("Could not read authoritative order total after creation:", readError?.message || "invalid total");
+    return json({ error: "Pedido registrado, mas não foi possível confirmar o valor. Tente novamente com o mesmo pedido." }, 503, origin);
+  }
+
+  let pix: { pix_key: string; pix_merchant_name: string } | null = null;
+  if (payload.p_payment_method === "pix") {
+    const { data: settings, error: settingsError } = await admin
+      .from("store_payment_settings")
+      .select("pix_key,pix_merchant_name,pix_enabled")
+      .eq("store_id", payload.p_store_id)
+      .maybeSingle();
+    if (settingsError) {
+      console.error("Could not read store payment settings:", settingsError.message);
+      return json({ error: "Pedido registrado, mas não foi possível confirmar o Pix. Tente novamente com o mesmo pedido." }, 503, origin);
+    }
+    if (settings?.pix_enabled) {
+      pix = { pix_key: settings.pix_key, pix_merchant_name: settings.pix_merchant_name };
+    }
+  }
+
+  return json({
+    order_id: savedOrder.id,
+    order_number: savedOrder.order_number,
+    subtotal_cents: savedOrder.subtotal_cents,
+    delivery_fee_cents: savedOrder.delivery_fee_cents,
+    total_cents: savedOrder.total_cents,
+    ...(pix || {}),
+  }, 201, origin);
 });
