@@ -38,4 +38,14 @@ describe("resolveCatalogImage", () => {
     expect(resolveCatalogImage(name, oldImage)).toBe(newImage);
     expect(resolveCatalogImage(name, "https://example.com/custom.webp")).toBe("https://example.com/custom.webp");
   });
+
+  it.each([
+    ["Batata Simples P", "/assets/products/batata-cheddar-bacon-burgerc.webp", "/assets/products/batata-simples-wide.webp"],
+    ["Batata Cheddar & Bacon G", "/assets/products/batata-cheddar-bacon-burgerc.webp", "/assets/products/batata-cheddar-bacon-wide.webp"],
+    ["Onion Rings P", "/assets/products/batata-cheddar-bacon-burgerc.webp", "/assets/products/onion-rings-wide.webp"],
+    ["Nuggets P", "/assets/products/chicken-crispy-burgerc.webp", "/assets/products/nuggets-wide.webp"],
+  ])("maps the purchasable size variant of %s", (name, oldImage, newImage) => {
+    expect(resolveCatalogImage(name, oldImage)).toBe(newImage);
+    expect(resolveCatalogImage(name, "https://example.com/custom.webp")).toBe("https://example.com/custom.webp");
+  });
 });
