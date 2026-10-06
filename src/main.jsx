@@ -45,17 +45,17 @@ const root = createRoot(rootElement);
 
 function renderBootError(error) {
   console.error("Erro ao iniciar o cardapio:", error);
-  rootElement.innerHTML = `
-    <main style="min-height:100vh;display:grid;place-items:center;padding:24px;font-family:Inter,system-ui,sans-serif;background:#fffaf2;color:#1f252d">
-      <section style="max-width:560px;background:#fff;border:1px solid #eadfce;border-radius:18px;padding:24px;box-shadow:0 18px 55px rgba(42,31,15,.12)">
-        <strong style="display:block;color:#df8b00;margin-bottom:8px">BurgerC</strong>
-        <h1 style="font-size:26px;margin:0 0 10px">Nao foi possivel carregar o cardapio.</h1>
-        <p style="margin:0 0 16px;color:#66707c">Recarregue a pagina. Se continuar, envie esta mensagem de erro.</p>
-        <pre style="white-space:pre-wrap;overflow:auto;max-height:220px;background:#1f252d;color:#fff;padding:14px;border-radius:10px">${String(error?.stack || error?.message || error)}</pre>
-        <button onclick="window.location.reload()" style="margin-top:16px;border:0;border-radius:12px;background:#f2a20f;color:#1f252d;font-weight:800;padding:12px 16px;cursor:pointer">Recarregar</button>
+  root.render(
+    <main style={{ minHeight: "100vh", display: "grid", placeItems: "center", padding: 24, fontFamily: "Inter,system-ui,sans-serif", background: "#fffaf2", color: "#1f252d" }}>
+      <section style={{ maxWidth: 560, background: "#fff", border: "1px solid #eadfce", borderRadius: 18, padding: 24, boxShadow: "0 18px 55px rgba(42,31,15,.12)" }}>
+        <strong style={{ display: "block", color: "#df8b00", marginBottom: 8 }}>BurgerC</strong>
+        <h1 style={{ fontSize: 26, margin: "0 0 10px" }}>Nao foi possivel carregar o cardapio.</h1>
+        <p style={{ margin: "0 0 16px", color: "#66707c" }}>Recarregue a pagina. Se continuar, envie esta mensagem de erro.</p>
+        <pre style={{ whiteSpace: "pre-wrap", overflow: "auto", maxHeight: 220, background: "#1f252d", color: "#fff", padding: 14, borderRadius: 10 }}>{String(error?.stack || error?.message || error)}</pre>
+        <button onClick={() => window.location.reload()} style={{ marginTop: 16, border: 0, borderRadius: 12, background: "#f2a20f", color: "#1f252d", fontWeight: 800, padding: "12px 16px", cursor: "pointer" }}>Recarregar</button>
       </section>
-    </main>
-  `;
+    </main>,
+  );
 }
 
 rootElement.innerHTML = '<p style="padding:24px;font-family:Inter,system-ui,sans-serif">Carregando BurgerC...</p>';

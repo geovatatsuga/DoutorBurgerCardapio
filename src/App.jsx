@@ -1,8 +1,12 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { isSupabaseConfigured, supabase } from "./lib/supabase";
 import OrdersKanban from "./components/admin/OrdersKanban";
 import OrderHistory from "./components/admin/OrderHistory";
+import BurgerShowcase from "./components/BurgerShowcase";
 import { uploadProductImage, fetchClientOrder } from "./services/supabaseData";
+import { resolveCatalogImage } from "./catalogImages";
+import { getRemovableIngredients } from "./removableIngredients";
+import "./components/ProductDetail.css";
 
 const money = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 const STORE_SLUG = "burgerc";
@@ -177,7 +181,7 @@ const initialProducts = [
     name: "X-Salada",
     description: "Um classico completo com carne suculenta de 90 g, queijo prato derretido e salada fresca no pao brioche dourado. A maionese de ervas fecha o sabor com leveza e deixa cada mordida equilibrada.",
     price: 18,
-    image: "/assets/products/x-salada-burgerc.webp",
+    image: "/assets/products/x-salada-wide.webp",
     active: true,
     isFavorite: true,
   },
@@ -187,7 +191,7 @@ const initialProducts = [
     name: "Cheeseburger",
     description: "Direto ao ponto: blend bovino suculento de 90 g, cheddar bem derretido e maionese da casa no pao brioche. Simples, cremoso e feito para matar a vontade de burger de verdade.",
     price: 16,
-    image: "/assets/products/cheeseburger-burgerc.webp",
+    image: "/assets/products/cheeseburger-wide.webp",
     active: true,
   },
   {
@@ -196,7 +200,7 @@ const initialProducts = [
     name: "X-Bacon",
     description: "Blend bovino de 90 g com cheddar derretido, bacon em tiras crocante e cebola chapeada. A maionese de alho traz aquele sabor marcante que combina com cada camada.",
     price: 22,
-    image: "/assets/products/x-bacon-burgerc.webp",
+    image: "/assets/products/x-bacon-wide.webp",
     active: true,
     isFavorite: true,
   },
@@ -206,7 +210,7 @@ const initialProducts = [
     name: "Agridoce",
     description: "Uma combinacao diferente e viciante: carne suculenta de 90 g, queijo coalho tostado e abacaxi caramelizado. A maionese de pimenta equilibra o doce, o salgado e uma picancia na medida.",
     price: 25,
-    image: "/assets/products/agridoce-burgerc.webp",
+    image: "/assets/products/agridoce-wide.webp",
     active: true,
   },
   {
@@ -215,7 +219,7 @@ const initialProducts = [
     name: "Duplo",
     description: "O mais pesado da casa: dois blends bovinos suculentos, duplo cheddar, bacon em cubos e cebola caramelizada no vinho. A maionese defumada com cebolinha deixa o Duplo intenso do inicio ao fim.",
     price: 30,
-    image: "/assets/products/duplo-burgerc.webp",
+    image: "/assets/products/duplo-wide.webp",
     active: true,
     isFavorite: true,
     ingredients: ["Pão brioche", "Blend bovino 90g", "Duplo cheddar", "Bacon em cubos", "Cebola caramelizada no vinho", "Maionese defumada"],
@@ -293,6 +297,13 @@ function nextOrderStatuses(currentStatus) {
 
 function centsToMoney(cents) {
   return Number(cents || 0) / 100;
+}
+
+function getProductModifierOption(product, groups, groupName, optionName) {
+  if (!product?.dbId) return null;
+  const allowedIds = product.allowedModifierGroupIds || [];
+  const group = groups.find((item) => item.name === groupName && allowedIds.includes(item.id));
+  return group?.modifier_options?.find((option) => option.is_active !== false && option.name === optionName) || null;
 }
 
 function moneyToCents(value) {
@@ -399,7 +410,7 @@ function mapProductFromDb(product) {
     description: product.description || "",
     price: centsToMoney(product.price_cents),
     originalPrice: product.original_price_cents ? centsToMoney(product.original_price_cents) : null,
-    image: product.image_path || "/assets/new-direction/doutor-burger.webp",
+    image: resolveCatalogImage(product.name, product.image_path),
     active: product.is_active,
     dbId: product.id,
     ingredients: product.ingredients || (productCardTags[product.name] ? [...productCardTags[product.name]] : []),
@@ -539,7 +550,7 @@ export default function App() {
     setExtras2((prev) =>
       prev.some((item) => item.name === name)
         ? prev.filter((item) => item.name !== name)
-        : [...prev, { name, price }]
+        : [...prev, typeof name === "object" ? name : { name, price, id: null }]
     );
   };
   const [note, setNote] = useState("");
@@ -562,11 +573,13 @@ export default function App() {
   const [checkoutPayment, setCheckoutPayment] = useState("Pix");
   const [checkoutChange, setCheckoutChange] = useState("");
   const [checkoutError, setCheckoutError] = useState("");
+  const clientOrderSubmitLock = useRef(false);
+  const orderRequestKeyRef = useRef(null);
 
   // Admin Dashboard State
   const [selectedAdminOrderId, setSelectedAdminOrderId] = useState(() => orders[0]?.id || "");
-  const [loginEmail, setLoginEmail] = useState(() => import.meta.env.VITE_ADMIN_EMAIL || "");
-  const [loginPassword, setLoginPassword] = useState(() => import.meta.env.VITE_ADMIN_PASSWORD || "");
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
   const [loginError, setLoginError] = useState("");
 
   // Product Add/Edit Form State
@@ -874,6 +887,24 @@ export default function App() {
       }
       let mappedProducts = dbProducts?.length ? dbProducts.map(mapProductFromDb) : [];
 
+      if (mappedProducts.length) {
+        const { data: productModifierLinks, error: modifierLinksError } = await supabase
+          .from("product_modifier_groups")
+          .select("product_id,group_id")
+          .in("product_id", mappedProducts.map((product) => product.id));
+
+        if (!modifierLinksError && productModifierLinks) {
+          const groupsByProduct = productModifierLinks.reduce((acc, link) => {
+            acc[link.product_id] = [...(acc[link.product_id] || []), link.group_id];
+            return acc;
+          }, {});
+          mappedProducts = mappedProducts.map((product) => ({
+            ...product,
+            allowedModifierGroupIds: groupsByProduct[product.id] || [],
+          }));
+        }
+      }
+
       await refreshRawMaterials(store.id);
       await refreshSuppliers(store.id);
       await refreshStockMovements(store.id);
@@ -1153,15 +1184,24 @@ export default function App() {
   const burgerProducts = useMemo(() => products.filter((p) => (p.category === "Burgers" || !p.name.toLowerCase().includes("combo")) && p.category !== "Bebidas" && p.category !== "Acompanhamentos" && p.category !== "Sobremesas" && p.active !== false), [products]);
   const selectedComboBurgerObj1 = burgerProducts.find((b) => b.name === comboBurger);
   const selectedComboBurgerObj2 = isMultiBurgerCombo ? burgerProducts.find((b) => b.name === comboBurger2) : null;
-  const comboBurgerExtraPrice1 = (isCombo && selectedComboBurgerObj1) ? (selectedComboBurgerObj1.name === "Duplo" ? 8 : selectedComboBurgerObj1.name === "Agridoce" ? 4 : 0) : 0;
-  const comboBurgerExtraPrice2 = (isMultiBurgerCombo && selectedComboBurgerObj2) ? (selectedComboBurgerObj2.name === "Duplo" ? 8 : selectedComboBurgerObj2.name === "Agridoce" ? 4 : 0) : 0;
+  const comboBurgerOption1 = isCombo ? getProductModifierOption(selectedProduct, modifierGroups, "Adicionais - Combo - Burger 1", selectedComboBurgerObj1?.name) : null;
+  const comboBurgerOption2 = isMultiBurgerCombo ? getProductModifierOption(selectedProduct, modifierGroups, "Adicionais - Combo - Burger 2", selectedComboBurgerObj2?.name) : null;
+  const comboBurgerExtraPrice1 = (isCombo && selectedComboBurgerObj1) ? (selectedProduct?.dbId ? centsToMoney(comboBurgerOption1?.price_cents) : (selectedComboBurgerObj1.name === "Duplo" ? 8 : selectedComboBurgerObj1.name === "Agridoce" ? 4 : 0)) : 0;
+  const comboBurgerExtraPrice2 = (isMultiBurgerCombo && selectedComboBurgerObj2) ? (selectedProduct?.dbId ? centsToMoney(comboBurgerOption2?.price_cents) : (selectedComboBurgerObj2.name === "Duplo" ? 8 : selectedComboBurgerObj2.name === "Agridoce" ? 4 : 0)) : 0;
   const comboBurgerExtraPrice = comboBurgerExtraPrice1 + comboBurgerExtraPrice2;
-  const comboSidePrice = (isCombo && (comboSide?.includes("Onion Rings") || comboSide?.includes("Nuggets"))) ? 3 : 0;
-  const comboPrice = isBurger && combo ? 11.9 : 0;
+  const comboSideModifier = isCombo && comboSide?.includes("Onion Rings")
+    ? getProductModifierOption(selectedProduct, modifierGroups, "Adicionais - Combo - Acompanhamento", "Onion Rings")
+    : isCombo && comboSide?.includes("Nuggets")
+    ? getProductModifierOption(selectedProduct, modifierGroups, "Adicionais - Combo - Acompanhamento", "Nuggets 6 un")
+    : null;
+  const comboSidePrice = (isCombo && (comboSide?.includes("Onion Rings") || comboSide?.includes("Nuggets"))) ? (selectedProduct?.dbId ? centsToMoney(comboSideModifier?.price_cents) : 3) : 0;
+  const comboToggleModifier = isBurger && combo ? getProductModifierOption(selectedProduct, modifierGroups, "Adicionais - Burgers", "Transformar em Combo (Batata + Bebida)") : null;
+  const comboPrice = isBurger && combo ? (selectedProduct?.dbId ? centsToMoney(comboToggleModifier?.price_cents) : 11.9) : 0;
   const extrasTotal1 = extras.reduce((sum, item) => sum + item.price, 0);
   const extrasTotal2 = isMultiBurgerCombo ? extras2.reduce((sum, item) => sum + item.price, 0) : 0;
   const extrasTotal = extrasTotal1 + extrasTotal2;
-  const sideSizePrice = (selectedProduct && (selectedProduct.category === "Acompanhamentos" || selectedProduct.category === "Batatas" || selectedProduct.category?.toLowerCase().includes("acomp")) && sideSize === "Grande (G)") ? 5 : 0;
+  const sideSizeModifier = sideSize === "Grande (G)" ? getProductModifierOption(selectedProduct, modifierGroups, "Adicionais - Acompanhamentos", "Porção Grande (G)") : null;
+  const sideSizePrice = (selectedProduct && (selectedProduct.category === "Acompanhamentos" || selectedProduct.category === "Batatas" || selectedProduct.category?.toLowerCase().includes("acomp")) && sideSize === "Grande (G)") ? (selectedProduct?.dbId ? centsToMoney(sideSizeModifier?.price_cents) : 5) : 0;
   const detailUnitPrice = selectedProduct ? (selectedProduct.price + extrasTotal + comboPrice + comboSidePrice + comboBurgerExtraPrice + sideSizePrice) : 0;
 
   const filteredProducts = useMemo(() => {
@@ -1258,6 +1298,19 @@ export default function App() {
       }
     }
 
+    if (selectedProduct?.dbId) {
+      const hasUnpricedSelection = extras.some((item) => !item.id)
+        || (combo && !getProductModifierOption(selectedProduct, modifierGroups, "Adicionais - Burgers", "Transformar em Combo (Batata + Bebida)"))
+        || (sideSize === "Grande (G)" && (selectedProduct.category === "Acompanhamentos" || selectedProduct.category === "Batatas") && !getProductModifierOption(selectedProduct, modifierGroups, "Adicionais - Acompanhamentos", "Porção Grande (G)"))
+        || (isCombo && selectedComboBurgerObj1 && ["Duplo", "Agridoce"].includes(selectedComboBurgerObj1.name) && !getProductModifierOption(selectedProduct, modifierGroups, "Adicionais - Combo - Burger 1", selectedComboBurgerObj1.name))
+        || (isMultiBurgerCombo && selectedComboBurgerObj2 && ["Duplo", "Agridoce"].includes(selectedComboBurgerObj2.name) && !getProductModifierOption(selectedProduct, modifierGroups, "Adicionais - Combo - Burger 2", selectedComboBurgerObj2.name))
+        || (isCombo && (comboSide.includes("Onion Rings") || comboSide.includes("Nuggets")) && !getProductModifierOption(selectedProduct, modifierGroups, "Adicionais - Combo - Acompanhamento", comboSide.includes("Onion Rings") ? "Onion Rings" : "Nuggets 6 un"));
+      if (hasUnpricedSelection) {
+        alert("Esta opção ainda não está configurada com preço no catálogo. Atualize as opções do produto no painel e tente novamente.");
+        return;
+      }
+    }
+
     const isBurger = Boolean(
       selectedProduct && !isCombo && (
         selectedProduct.category === "Burgers" ||
@@ -1292,6 +1345,15 @@ export default function App() {
         image: selectedProduct.image,
         price: detailUnitPrice,
         qty: detailQty,
+        modifierOptionIds: [
+          ...extras.map((item) => item.id),
+          ...(isMultiBurgerCombo ? extras2.map((item) => item.id) : []),
+          comboToggleModifier?.id,
+          sideSizeModifier?.id,
+          comboBurgerOption1?.id,
+          comboBurgerOption2?.id,
+          comboSideModifier?.id,
+        ].filter(Boolean),
         notes: isCombo
           ? [comboDetailsText, note.trim()].filter(Boolean).join(" + ")
           : [
@@ -1310,8 +1372,9 @@ export default function App() {
     setCart((items) => items.map((item) => (item.key === key ? { ...item, qty: item.qty + delta } : item)).filter((item) => item.qty > 0));
   }
 
-  function toggleExtra(name, price) {
-    setExtras((items) => (items.some((item) => item.name === name) ? items.filter((item) => item.name !== name) : [...items, { name, price }]));
+  function toggleExtra(option, price) {
+    const item = typeof option === "object" ? option : { name: option, price, id: null };
+    setExtras((items) => (items.some((current) => current.name === item.name) ? items.filter((current) => current.name !== item.name) : [...items, item]));
   }
 
   // Handle Client Checkout
@@ -1338,7 +1401,32 @@ export default function App() {
       return;
     }
 
+    if (clientOrderSubmitLock.current) return;
+    clientOrderSubmitLock.current = true;
     setCheckoutError("");
+    const requestFingerprint = JSON.stringify({
+      store: activeStoreId,
+      items: cart.map((item) => [item.dbId || item.id, item.qty, item.notes || "", item.modifierOptionIds || []]),
+      fulfillment: receiveMode,
+      name: checkoutName.trim(),
+      phone: checkoutPhone.trim(),
+      address: checkoutAddress.trim(),
+      complement: checkoutComplement.trim(),
+      zone: selectedDeliveryZone?.id || null,
+      payment: checkoutPayment,
+      change: checkoutChange.trim(),
+    });
+    try {
+      const savedRequest = JSON.parse(sessionStorage.getItem("doutor_pending_order_request") || "null");
+      if (savedRequest?.fingerprint === requestFingerprint && savedRequest.key) {
+        orderRequestKeyRef.current = savedRequest.key;
+      } else {
+        orderRequestKeyRef.current = crypto.randomUUID();
+        sessionStorage.setItem("doutor_pending_order_request", JSON.stringify({ fingerprint: requestFingerprint, key: orderRequestKeyRef.current }));
+      }
+    } catch {
+      orderRequestKeyRef.current ||= crypto.randomUUID();
+    }
     const orderId = "#" + Math.floor(1000 + Math.random() * 9000);
     const paymentMethod = checkoutPayment === "Dinheiro" && checkoutChange.trim()
       ? `Dinheiro (Troco para R$ ${checkoutChange})`
@@ -1363,28 +1451,38 @@ export default function App() {
     if (supabase) {
       if (!activeStoreId) {
         setCheckoutError("Banco Supabase ainda nao carregado. Aplique as migrations e tente novamente.");
+        clientOrderSubmitLock.current = false;
         return;
       }
 
       try {
-        const { data: rpcOrderId, error } = await supabase.rpc("place_order", {
-          p_store_id: activeStoreId,
-          p_fulfillment: receiveMode === "Entrega" ? "delivery" : "pickup",
-          p_customer_name: checkoutName.trim(),
-          p_customer_phone: checkoutPhone.trim(),
-          p_delivery_address: receiveMode === "Entrega" ? { street: checkoutAddress.trim(), complement: checkoutComplement.trim() || null, delivery_zone_id: selectedDeliveryZone?.id || null, delivery_zone_name: selectedDeliveryZone?.name || null } : null,
-          p_payment_method: checkoutPayment === "Dinheiro" ? "cash" : checkoutPayment === "Pix" ? "pix" : "credit_card",
-          p_items: cart.map((item) => ({
-            product_id: item.dbId || item.id,
-            quantity: item.qty,
-            notes: item.notes || null,
-          })),
-          p_notes: checkoutPayment === "Dinheiro" && checkoutChange.trim() ? `Troco para R$ ${checkoutChange}` : null,
+        const { data: createdOrder, error } = await supabase.functions.invoke("place-order", {
+          body: {
+            p_store_id: activeStoreId,
+            p_request_key: orderRequestKeyRef.current,
+            p_fulfillment: receiveMode === "Entrega" ? "delivery" : "pickup",
+            p_customer_name: checkoutName.trim(),
+            p_customer_phone: checkoutPhone.trim(),
+            p_delivery_address: receiveMode === "Entrega" ? { street: checkoutAddress.trim(), complement: checkoutComplement.trim() || null, delivery_zone_id: selectedDeliveryZone?.id || null, delivery_zone_name: selectedDeliveryZone?.name || null } : null,
+            p_payment_method: checkoutPayment === "Dinheiro" ? "cash" : checkoutPayment === "Pix" ? "pix" : checkoutPayment === "Cartão de Débito" ? "debit_card" : "credit_card",
+            p_items: cart.map((item) => ({
+              product_id: item.dbId || item.id,
+              quantity: item.qty,
+              notes: item.notes || null,
+              modifier_option_ids: item.modifierOptionIds || [],
+            })),
+            p_notes: checkoutPayment === "Dinheiro" && checkoutChange.trim() ? `Troco para R$ ${checkoutChange}` : null,
+          },
         });
         if (error) throw error;
+        const rpcOrderId = createdOrder?.order_id;
+        if (!rpcOrderId) throw new Error("Não foi possível confirmar o pedido criado.");
         newOrder = { ...newOrder, id: `#${String(rpcOrderId).slice(0, 8)}`, dbId: rpcOrderId };
+        sessionStorage.removeItem("doutor_pending_order_request");
+        orderRequestKeyRef.current = null;
       } catch (error) {
         setCheckoutError(error.message || "Não foi possível criar o pedido.");
+        clientOrderSubmitLock.current = false;
         return;
       }
     }
@@ -1394,6 +1492,7 @@ export default function App() {
     setCurrentClientOrder(newOrder);
     setCart([]);
     setFlow("success");
+    clientOrderSubmitLock.current = false;
     playNotificationSound("client");
 
     // Broadcast new order to other tabs
@@ -3764,6 +3863,14 @@ _Pedido enviado via Cardápio Digital!_`;
           setComboSide={setComboSide}
           comboBurger={comboBurger}
           setComboBurger={setComboBurger}
+          comboBurger2={comboBurger2}
+          setComboBurger2={setComboBurger2}
+          meat2={meat2}
+          setMeat2={setMeat2}
+          removedIngredients2={removedIngredients2}
+          setRemovedIngredients2={setRemovedIngredients2}
+          extras2={extras2}
+          toggleExtra2={toggleExtra2}
           burgerProducts={burgerProducts}
           note={note}
           setNote={setNote}
@@ -3945,9 +4052,10 @@ function Header({ count, onHome, onCart, onTrack, currentClientOrder, isStoreOpe
 
 function Catalog({ activeCategory, categories, filteredProducts, products, storeSettings, deliveryZones, isStoreOpen, currentFee, currentMinOrder, search, setActiveCategory, setSearch, openProduct, addQuick, onOpenAbout, onOpenFaq, onOpenPrivacy, onOpenTerms }) {
   const comboProducts = products.filter((product) => product.active && product.category === "Combos");
+  const featuredDuplo = products.find((product) => product.active && product.name === "Duplo");
   return (
     <section className="catalog" id="inicio">
-      <Hero storeSettings={storeSettings} deliveryZones={deliveryZones} isStoreOpen={isStoreOpen} currentFee={currentFee} currentMinOrder={currentMinOrder} />
+      <Hero storeSettings={storeSettings} deliveryZones={deliveryZones} isStoreOpen={isStoreOpen} currentFee={currentFee} currentMinOrder={currentMinOrder} featuredProduct={featuredDuplo} openProduct={openProduct} />
       <Combos products={comboProducts} openProduct={openProduct} isStoreOpen={isStoreOpen} />
       <Favorites products={products} openProduct={openProduct} />
       <section className="section-block" id="cardapio">
@@ -3984,7 +4092,7 @@ function Catalog({ activeCategory, categories, filteredProducts, products, store
   );
 }
 
-function Hero({ storeSettings, deliveryZones, isStoreOpen, currentFee, currentMinOrder }) {
+function Hero({ storeSettings, deliveryZones, isStoreOpen, currentFee, currentMinOrder, featuredProduct, openProduct }) {
   const storeName = (storeSettings.name || "BurgerC").replace(/([a-z])([A-Z])/g, "$1 $2");
   const titleParts = storeName.split(/\s+/);
   const firstTitle = titleParts[0] || storeName;
@@ -3999,23 +4107,36 @@ function Hero({ storeSettings, deliveryZones, isStoreOpen, currentFee, currentMi
   const minOrderLabel = zoneMinimums.length ? `Min. ${money.format(Math.min(...zoneMinimums))}` : currentMinOrder > 0 ? `Min. ${money.format(currentMinOrder)}` : "Sem minimo";
 
   return (
-    <div className="hero">
+    <div className={`hero${featuredProduct ? " hero--duplo" : ""}`}>
       <div className="hero-copy">
-        <span className="eyebrow">{statusText} - Entrega {storeSettings.deliveryTime}</span>
+        <span className="eyebrow">{featuredProduct ? "Doutor Burger · feito na chapa" : `${statusText} - Entrega ${storeSettings.deliveryTime}`}</span>
         <h1><span>{firstTitle}</span>{secondTitle && <span>{secondTitle}</span>}</h1>
-        <p>Burgers artesanais, combos e batatas para matar sua fome hoje em Joao Pessoa.</p>
+        <p>Burgers artesanais feitos na chapa, combos para dividir e tudo pronto para pedir em Joao Pessoa.</p>
         <div className="hero-actions">
           <button className="primary-btn" onClick={() => document.querySelector("#cardapio")?.scrollIntoView({ behavior: "smooth" })}>Ver cardapio</button>
-          <a className="hero-link" href="#ofertas">Ver ofertas</a>
+          <a className="hero-link" href="#mais-pedidos">Mais pedidos</a>
         </div>
-        <div className="hero-meta">
-          <span><Icon name="clock" /><strong>{statusText}</strong> {closeLabel}</span>
-          <span><Icon name="bike" /><strong>Entrega</strong> {storeSettings.deliveryTime}</span>
-          <span><Icon name="bag" /><strong>Retirada</strong> 20-30 min</span>
-          <span><Icon name="coin" /><strong>Taxas</strong> {feeLabel} - {minOrderLabel}</span>
-        </div>
+        {featuredProduct ? (
+          <div className="hero-meta hero-meta--editorial">
+            <div className="hero-fact"><Icon name="clock" /><div><strong>{statusText}</strong><small>{closeLabel}</small></div></div>
+            <div className="hero-fact"><Icon name="bike" /><div><strong>Entrega</strong><small>{storeSettings.deliveryTime}</small></div></div>
+            <div className="hero-fact"><Icon name="bag" /><div><strong>Retirada</strong><small>20-30 min</small></div></div>
+            <div className="hero-fact"><Icon name="coin" /><div><strong>Taxas</strong><small>{feeLabel} · {minOrderLabel}</small></div></div>
+          </div>
+        ) : (
+          <div className="hero-meta">
+            <span><Icon name="clock" /><strong>{statusText}</strong> {closeLabel}</span>
+            <span><Icon name="bike" /><strong>Entrega</strong> {storeSettings.deliveryTime}</span>
+            <span><Icon name="bag" /><strong>Retirada</strong> 20-30 min</span>
+            <span><Icon name="coin" /><strong>Taxas</strong> {feeLabel} - {minOrderLabel}</span>
+          </div>
+        )}
       </div>
-      <img src="/assets/new-direction/doutor-burger.webp" alt="Doutor Burger em destaque" width="960" height="960" decoding="async" fetchPriority="high" />
+      {featuredProduct ? (
+        <BurgerShowcase product={featuredProduct} onOpen={openProduct} priceLabel={money.format(featuredProduct.price)} />
+      ) : (
+        <img src="/assets/new-direction/doutor-burger.webp" alt="Doutor Burger em destaque" width="960" height="960" decoding="async" fetchPriority="high" />
+      )}
     </div>
   );
 }
@@ -4033,8 +4154,8 @@ function Favorites({ products, openProduct }) {
       <div className="favorite-grid">
         {favorites.map((product, index) => {
           return (
-            <article className="favorite-card" key={product.id} onClick={() => openProduct(product.id)} style={{ cursor: "pointer" }}>
-              <img src={product.image} alt={product.name} width="960" height="960" loading="lazy" decoding="async" />
+            <article className={`favorite-card${product.category === "Burgers" ? " favorite-card--burger" : ""}`} key={product.id} onClick={() => openProduct(product.id)} style={{ cursor: "pointer" }}>
+              <img src={resolveCatalogImage(product.name, product.image)} alt={product.name} width="1200" height="900" loading="lazy" decoding="async" />
               <span style={{ zIndex: 1 }}>{labels[index]}</span>
               <h3>{product.name}</h3>
               <strong>{money.format(product.price)}</strong>
@@ -4055,8 +4176,8 @@ function ProductRow({ product, openProduct, addQuick, isStoreOpen }) {
         .filter(Boolean));
 
   return (
-    <article className="product-card" onClick={() => openProduct(product.id)} style={{ cursor: "pointer" }}>
-      <img src={product.image} alt={product.name} width="960" height="960" loading="lazy" decoding="async" />
+    <article className={`product-card${product.category === "Burgers" ? " product-card--burger" : ""}`} onClick={() => openProduct(product.id)} style={{ cursor: "pointer" }}>
+      <img src={resolveCatalogImage(product.name, product.image)} alt={product.name} width="1200" height="900" loading="lazy" decoding="async" />
       <div className="product-card-body">
         <h3>{product.name}</h3>
         <ul className="product-ingredients" aria-label="Ingredientes do burger">
@@ -4104,7 +4225,7 @@ function Combos({ products, openProduct, isStoreOpen }) {
         {products.map((product) => {
           return (
             <article className="combo-card" key={product.id} onClick={() => openProduct(product.id)} style={{ cursor: "pointer" }}>
-              <img src={product.image} alt={product.name} width="960" height="960" loading="lazy" decoding="async" />
+              <img src={resolveCatalogImage(product.name, product.image)} alt={product.name} width="1200" height="900" loading="lazy" decoding="async" />
               <h3>{product.name}</h3>
               <ul className="combo-includes">
                 {product.description.split(",").map((item) => <li key={item}>{item.trim()}</li>)}
@@ -4240,6 +4361,8 @@ function ProductDetail({
       (product.category && product.category.toLowerCase().includes("acomp"))
     )
   );
+  const isDrink = product?.category === "Bebidas";
+  const isDessert = product?.category === "Sobremesas";
   const isMultiBurgerCombo = Boolean(
     isCombo && (
       (product?.name && (
@@ -4259,6 +4382,10 @@ function ProductDetail({
   );
 
   const [activeComboTab, setActiveComboTab] = useState(1);
+  const productDetailRef = useRef(null);
+  const wizardIntroRef = useRef(null);
+  const swipeStartRef = useRef(null);
+  const [wizardIndex, setWizardIndex] = useState(0);
 
   useEffect(() => {
     setActiveComboTab(1);
@@ -4311,11 +4438,9 @@ function ProductDetail({
   // Filter modifier groups specifically assigned to this product (or all if none specified)
   const productModifierGroups = useMemo(() => {
     if (!modifierGroups || !modifierGroups.length) return [];
-    if (product?.allowedModifierGroupIds && product.allowedModifierGroupIds.length > 0) {
-      return modifierGroups.filter((g) => product.allowedModifierGroupIds.includes(g.id));
-    }
-    // If not specifically configured and it's a burger or side, show general groups
-    return modifierGroups;
+    return modifierGroups.filter((g) =>
+      (product?.allowedModifierGroupIds || []).includes(g.id) && /adicionais/i.test(g.name)
+    );
   }, [modifierGroups, product?.allowedModifierGroupIds]);
 
   const dbOptionsMap = useMemo(() => {
@@ -4323,7 +4448,7 @@ function ProductDetail({
     (productModifierGroups || []).forEach((group) => {
       (group.modifier_options || []).forEach((opt) => {
         if (opt.is_active !== false) {
-          list.push([opt.name, centsToMoney(opt.price_cents)]);
+          list.push({ id: opt.id, name: opt.name, price: centsToMoney(opt.price_cents) });
         }
       });
     });
@@ -4331,14 +4456,67 @@ function ProductDetail({
   }, [productModifierGroups]);
 
   const extraOptions = useMemo(() => {
-    const combined = [...defaultExtraOptions];
-    dbOptionsMap.forEach(([name, price]) => {
-      if (!combined.some(([n]) => n === name)) {
-        combined.push([name, price]);
-      }
+    if (product?.dbId) return dbOptionsMap.filter((option) => option.name !== "Transformar em Combo (Batata + Bebida)");
+    const combined = [...defaultExtraOptions.map(([name, price]) => ({ name, price, id: null }))];
+    dbOptionsMap.forEach((option) => {
+      if (!combined.some((existing) => existing.name === option.name)) combined.push(option);
     });
     return combined;
-  }, [defaultExtraOptions, dbOptionsMap]);
+  }, [defaultExtraOptions, dbOptionsMap, product?.dbId]);
+  const comboUpgradeOption = getProductModifierOption(product, modifierGroups, "Adicionais - Burgers", "Transformar em Combo (Batata + Bebida)");
+  const comboUpgradeAvailable = !product?.dbId || Boolean(comboUpgradeOption);
+  const comboUpgradePrice = product?.dbId ? centsToMoney(comboUpgradeOption?.price_cents) : 11.9;
+  const hasComplementChoices = extraOptions.length > 0 || comboUpgradeAvailable;
+
+  const wizardSteps = isMultiBurgerCombo
+    ? ["burger1", "point1", "remove1", "burger2", "point2", "remove2", "side", "drink", "finish"]
+    : isCombo
+    ? ["burger1", "point1", "remove1", "side", "drink", "finish"]
+    : isBurger
+    ? ["point1", "remove1", ...(hasComplementChoices ? ["extras"] : []), "finish"]
+    : [];
+  const wizardLabels = {
+    burger1: isMultiBurgerCombo ? "1º hambúrguer" : "Hambúrguer",
+    point1: "Ponto da carne",
+    remove1: "Ingredientes",
+    burger2: "2º hambúrguer",
+    point2: "Ponto do 2º",
+    remove2: "Ingredientes do 2º",
+    extras: "Complementos",
+    side: "Acompanhamento",
+    drink: "Bebida",
+    finish: "Revisar pedido",
+  };
+  const currentWizardStage = wizardSteps[wizardIndex];
+  const wizardIsFinal = currentWizardStage === "finish";
+  const wizardCanAdvance = currentWizardStage === "burger1" ? Boolean(comboBurger)
+    : currentWizardStage === "burger2" ? Boolean(comboBurger2)
+    : true;
+  const moveWizard = (direction) => {
+    const nextIndex = Math.min(wizardSteps.length - 1, Math.max(0, wizardIndex + direction));
+    if (direction > 0 && !wizardCanAdvance) return;
+    setWizardIndex(nextIndex);
+    if (isMultiBurgerCombo) setComboStep(nextIndex >= wizardSteps.indexOf("burger2") ? 2 : 1);
+  };
+
+  const handleWizardTouchStart = (event) => {
+    if (!wizardSteps.length || !window.matchMedia("(max-width: 760px)").matches) return;
+    if (event.target.closest("button, input, textarea, label, a, select")) return;
+    const touch = event.touches[0];
+    swipeStartRef.current = { x: touch.clientX, y: touch.clientY };
+  };
+
+  const handleWizardTouchEnd = (event) => {
+    const start = swipeStartRef.current;
+    swipeStartRef.current = null;
+    if (!start) return;
+    const touch = event.changedTouches[0];
+    const dx = touch.clientX - start.x;
+    const dy = touch.clientY - start.y;
+    if (Math.abs(dx) < 70 || Math.abs(dy) > 45) return;
+    if (dx < 0 && !wizardIsFinal) moveWizard(1);
+    if (dx > 0 && wizardIndex > 0) moveWizard(-1);
+  };
 
   const drinkOptions = [
     "Coca-Cola 350ml",
@@ -4354,18 +4532,24 @@ function ProductDetail({
     "Nuggets 6 un (+ R$ 3,00)",
   ];
 
-  // Dynamic removable ingredients based on recipe / ingredients saved in product
-  const removableItems = useMemo(() => {
-    if (product?.ingredients && product.ingredients.length > 0) {
-      return product.ingredients;
-    }
-    if (productCardTags[product?.name]) {
-      return productCardTags[product.name];
-    }
-    return isCombo
-      ? ["Cebola", "Tomate", "Picles", "Maionese"]
-      : ["Cebola", "Tomate", "Picles", "Salada fresca"];
-  }, [product, isCombo]);
+  const selectedBurger = burgerProducts?.find((item) => item.name === comboBurger);
+  const selectedBurger2 = burgerProducts?.find((item) => item.name === comboBurger2);
+  const removableItems = getRemovableIngredients(isCombo ? selectedBurger : product);
+  const removableItems2 = getRemovableIngredients(selectedBurger2);
+  const customizationCount = (removedIngredients?.length || 0) + (removedIngredients2?.length || 0) + extras.length + (extras2?.length || 0) + Number(Boolean(combo));
+  const burgerChoicePrice = (name, index) => {
+    if (name !== "Duplo" && name !== "Agridoce") return 0;
+    if (!product?.dbId) return name === "Duplo" ? 8 : 4;
+    const option = getProductModifierOption(product, modifierGroups, `Adicionais - Combo - Burger ${index}`, name);
+    return option ? centsToMoney(option.price_cents) : null;
+  };
+  const sideChoicePrice = (side) => {
+    const optionName = side.includes("Onion Rings") ? "Onion Rings" : side.includes("Nuggets") ? "Nuggets 6 un" : null;
+    if (!optionName) return 0;
+    if (!product?.dbId) return 3;
+    const option = getProductModifierOption(product, modifierGroups, "Adicionais - Combo - Acompanhamento", optionName);
+    return option ? centsToMoney(option.price_cents) : null;
+  };
 
   const galleryImages = useMemo(() => {
     if (!product || !product.image) return [];
@@ -4376,8 +4560,17 @@ function ProductDetail({
   const [comboStep, setComboStep] = useState(1);
 
   useEffect(() => {
+    if (window.matchMedia("(max-width: 760px)").matches) {
+      productDetailRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    } else if (wizardIndex > 0) {
+      wizardIntroRef.current?.scrollIntoView({ block: "start", behavior: "auto" });
+    }
+  }, [wizardIndex]);
+
+  useEffect(() => {
     setActiveImgIndex(0);
     setComboStep(1);
+    setWizardIndex(0);
   }, [product]);
 
   const nextImage = (e) => {
@@ -4403,15 +4596,30 @@ function ProductDetail({
   };
 
   const extrasTotal = extras.reduce((sum, item) => sum + item.price, 0);
-  const comboSidePrice = (isCombo && comboSide?.includes("Onion Rings")) ? 3 : 0;
+  const comboSidePrice = (isCombo && (comboSide?.includes("Onion Rings") || comboSide?.includes("Nuggets")))
+    ? (product?.dbId
+      ? centsToMoney(getProductModifierOption(product, modifierGroups, "Adicionais - Combo - Acompanhamento", comboSide.includes("Onion Rings") ? "Onion Rings" : "Nuggets 6 un")?.price_cents)
+      : 3)
+    : 0;
   const selectedComboBurgerObj = (burgerProducts || []).find((b) => b.name === comboBurger);
-  const comboBurgerExtraPrice = (isCombo && selectedComboBurgerObj) ? (selectedComboBurgerObj.name === "Duplo" ? 8 : selectedComboBurgerObj.name === "Agridoce" ? 4 : 0) : 0;
-  const comboPrice = isBurger && combo ? 11.9 : 0;
-  const sideSizePrice = isSide && sideSize === "Grande (G)" ? 5 : 0;
+  const comboBurgerExtraPrice = (isCombo && selectedComboBurgerObj)
+    ? (product?.dbId
+      ? centsToMoney(getProductModifierOption(product, modifierGroups, "Adicionais - Combo - Burger 1", selectedComboBurgerObj.name)?.price_cents)
+      : selectedComboBurgerObj.name === "Duplo" ? 8 : selectedComboBurgerObj.name === "Agridoce" ? 4 : 0)
+    : 0;
+  const secondBurgerExtraPrice = isMultiBurgerCombo && selectedBurger2
+    ? (burgerChoicePrice(selectedBurger2.name, 2) || 0)
+    : 0;
+  const comboPrice = isBurger && combo
+    ? (product?.dbId ? centsToMoney(getProductModifierOption(product, modifierGroups, "Adicionais - Burgers", "Transformar em Combo (Batata + Bebida)")?.price_cents) : 11.9)
+    : 0;
+  const sideSizePrice = isSide && sideSize === "Grande (G)"
+    ? (product?.dbId ? centsToMoney(getProductModifierOption(product, modifierGroups, "Adicionais - Acompanhamentos", "Porção Grande (G)")?.price_cents) : 5)
+    : 0;
 
   return (
     <div className="drawer is-open" id="productDrawer" aria-hidden="false">
-      <section className={`drawer-card product-detail ${product?.category === "Bebidas" ? "drink-detail" : ""}`} role="dialog" aria-modal="true" aria-label="Detalhe do produto">
+      <section ref={productDetailRef} className={`drawer-card product-detail ${product?.category === "Bebidas" ? "drink-detail" : ""} ${wizardSteps.length ? "is-wizard" : ""}`} data-wizard-stage={currentWizardStage} role="dialog" aria-modal="true" aria-label="Detalhe do produto" onTouchStart={handleWizardTouchStart} onTouchEnd={handleWizardTouchEnd}>
         <nav className="detail-breadcrumb" aria-label="Caminho">
           <button className="back-link" onClick={onBack} type="button">←</button>
           <span>Inicio</span>
@@ -4448,6 +4656,19 @@ function ProductDetail({
                 <div className="detail-badges"><span>Mais pedido <Icon name="flame" /></span><span><Icon name="star" /> 4,8 (2.340)</span></div>
                 <div className="title-row"><div><h2>{product.name}</h2><p>{product.description}</p></div><strong>{money.format(product.price)}</strong></div>
               </div>
+              {(isBurger || isCombo) && (
+                <div className="detail-customize-intro" ref={wizardIntroRef} aria-live="polite">
+                  <div className="wizard-intro-top">
+                    <span>Etapa {wizardIndex + 1} de {wizardSteps.length}</span>
+                    {wizardIndex > 0 && <button type="button" onClick={() => moveWizard(-1)} aria-label="Voltar uma etapa">← Voltar</button>}
+                  </div>
+                  <strong>{wizardLabels[currentWizardStage]}</strong>
+                  <div className="wizard-progress" role="progressbar" aria-label="Progresso da montagem" aria-valuemin="1" aria-valuemax={wizardSteps.length} aria-valuenow={wizardIndex + 1}>
+                    <span style={{ width: `${((wizardIndex + 1) / wizardSteps.length) * 100}%` }} />
+                  </div>
+                  <small>{wizardIsFinal ? `${customizationCount} ${customizationCount === 1 ? "ajuste" : "ajustes"} na montagem` : "As próximas escolhas ficam salvas enquanto você avança."}</small>
+                </div>
+              )}
 
               {isCombo && (
                 <>
@@ -4468,7 +4689,7 @@ function ProductDetail({
                             { id: "duplo", name: "Duplo", description: "2 carnes 90g, duplo cheddar e bacon", image: "/assets/products/duplo-burgerc.webp", extraPrice: 8 },
                           ]).map((b) => {
                             const isSelected = comboBurger === b.name;
-                            const extraCost = b.name === "Duplo" ? 8 : b.name === "Agridoce" ? 4 : 0;
+                            const extraCost = burgerChoicePrice(b.name, 1);
                             const burgerImg = b.image || {
                               "X-Salada": "/assets/products/x-salada-burgerc.webp",
                               Cheeseburger: "/assets/products/cheeseburger-burgerc.webp",
@@ -4477,16 +4698,16 @@ function ProductDetail({
                               Duplo: "/assets/products/duplo-burgerc.webp",
                             }[b.name] || "/assets/new-direction/doutor-burger.webp";
                             return (
-                              <label key={b.id || b.name} className={isSelected ? "is-selected" : ""} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", borderRadius: "14px", cursor: "pointer" }}>
+                              <label key={b.id || b.name} className={isSelected ? "is-selected" : ""} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", borderRadius: "14px", cursor: extraCost === null ? "not-allowed" : "pointer" }}>
                                 <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                                  <input name="comboBurger" type="radio" checked={isSelected} onChange={() => setComboBurger(b.name)} />
-                                  <img src={burgerImg} alt={b.name} style={{ width: "42px", height: "42px", borderRadius: "8px", objectFit: "cover", flexShrink: 0, border: "1px solid var(--line)" }} />
+                                    <input name="comboBurger" type="radio" disabled={extraCost === null} checked={isSelected} onChange={() => { setComboBurger(b.name); setRemovedIngredients([]); }} />
+                                  <img src={resolveCatalogImage(b.name, burgerImg)} alt={b.name} style={{ width: "42px", height: "42px", borderRadius: "8px", objectFit: "cover", flexShrink: 0, border: "1px solid var(--line)" }} />
                                   <div style={{ textAlign: "left" }}>
                                     <strong style={{ fontSize: "15px", display: "block" }}>{b.name}</strong>
                                     <small style={{ display: "block", color: "#68717d", fontSize: "12px", marginTop: "2px" }}>{b.description}</small>
                                   </div>
                                 </div>
-                                {extraCost > 0 && <span style={{ fontWeight: 800, color: "#ee8500", fontSize: "13px" }}>+ {money.format(extraCost)}</span>}
+                                {extraCost === null ? <span className="choice-unavailable">Indisponível</span> : extraCost > 0 && <span className="choice-price">+ {money.format(extraCost)}</span>}
                               </label>
                             );
                           })}
@@ -4504,7 +4725,7 @@ function ProductDetail({
                             return (
                               <label key={mode} className={isSelected ? "is-selected" : ""}>
                                 <input name="meat" type="radio" checked={isSelected} onChange={() => setMeat(mode)} />
-                                {mode}
+                                {mode === "Ao ponto" ? "Ponto da casa (ao ponto)" : mode}
                               </label>
                             );
                           })}
@@ -4513,8 +4734,8 @@ function ProductDetail({
 
                       <div className="detail-section removal-section">
                         <div className="detail-section-title">
-                          <h3>Remover ingredientes do 1º Burger ({comboBurger || "X-Salada"})</h3>
-                          <p>Marque apenas o que você quer tirar do 1º burger.</p>
+                          <h3>Retirar ingredientes do 1º Burger (opcional)</h3>
+                          <p>O pão e a carne permanecem. Retire apenas os acompanhamentos que não quiser.</p>
                         </div>
                         <div className="option-grid compact-options">
                           {removableItems.map((ing) => {
@@ -4531,7 +4752,7 @@ function ProductDetail({
 
                       <button
                         type="button"
-                        className="primary-btn full"
+                        className="primary-btn full legacy-combo-next"
                         disabled={!comboBurger}
                         onClick={() => setComboStep(2)}
                         style={{ marginTop: "16px", height: "48px", borderRadius: "14px", fontSize: "15px" }}
@@ -4543,7 +4764,7 @@ function ProductDetail({
                     <>
                       {/* BANNER DE RESUMO DO 1º BURGER SE FOR MULTI-BURGER */}
                       {isMultiBurgerCombo && (
-                        <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", padding: "12px 16px", borderRadius: "14px", marginBottom: "16px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                        <div className="combo-first-summary" style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", padding: "12px 16px", borderRadius: "14px", marginBottom: "16px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                           <div>
                             <strong style={{ color: "#15803d", fontSize: "14px", display: "block" }}>✓ 1º Burger Escolhido: {comboBurger || "X-Salada"} ({meat})</strong>
                             <small style={{ color: "#166534", fontSize: "12px" }}>
@@ -4570,7 +4791,7 @@ function ProductDetail({
                               { id: "duplo", name: "Duplo", description: "2 carnes 90g, duplo cheddar e bacon", image: "/assets/products/duplo-burgerc.webp", extraPrice: 8 },
                             ]).map((b) => {
                               const isSelected = comboBurger === b.name;
-                              const extraCost = b.name === "Duplo" ? 8 : b.name === "Agridoce" ? 4 : 0;
+                              const extraCost = burgerChoicePrice(b.name, 1);
                               const burgerImg = b.image || {
                                 "X-Salada": "/assets/products/x-salada-burgerc.webp",
                                 Cheeseburger: "/assets/products/cheeseburger-burgerc.webp",
@@ -4579,16 +4800,16 @@ function ProductDetail({
                                 Duplo: "/assets/products/duplo-burgerc.webp",
                               }[b.name] || "/assets/new-direction/doutor-burger.webp";
                               return (
-                                <label key={b.id || b.name} className={isSelected ? "is-selected" : ""} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", borderRadius: "14px", cursor: "pointer" }}>
+                                <label key={b.id || b.name} className={isSelected ? "is-selected" : ""} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", borderRadius: "14px", cursor: extraCost === null ? "not-allowed" : "pointer" }}>
                                   <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                                    <input name="comboBurger" type="radio" checked={isSelected} onChange={() => setComboBurger(b.name)} />
-                                    <img src={burgerImg} alt={b.name} style={{ width: "42px", height: "42px", borderRadius: "8px", objectFit: "cover", flexShrink: 0, border: "1px solid var(--line)" }} />
+                                  <input name="comboBurger" type="radio" disabled={extraCost === null} checked={isSelected} onChange={() => { setComboBurger(b.name); setRemovedIngredients([]); }} />
+                                    <img src={resolveCatalogImage(b.name, burgerImg)} alt={b.name} style={{ width: "42px", height: "42px", borderRadius: "8px", objectFit: "cover", flexShrink: 0, border: "1px solid var(--line)" }} />
                                     <div style={{ textAlign: "left" }}>
                                       <strong style={{ fontSize: "15px", display: "block" }}>{b.name}</strong>
                                       <small style={{ display: "block", color: "#68717d", fontSize: "12px", marginTop: "2px" }}>{b.description}</small>
                                     </div>
                                   </div>
-                                  {extraCost > 0 && <span style={{ fontWeight: 800, color: "#ee8500", fontSize: "13px" }}>+ {money.format(extraCost)}</span>}
+                                {extraCost === null ? <span className="choice-unavailable">Indisponível</span> : extraCost > 0 && <span className="choice-price">+ {money.format(extraCost)}</span>}
                                 </label>
                               );
                             })}
@@ -4609,7 +4830,7 @@ function ProductDetail({
                                 return (
                                   <label key={mode} className={isSelected ? "is-selected" : ""}>
                                     <input name="meat" type="radio" checked={isSelected} onChange={() => setMeat(mode)} />
-                                    {mode}
+                                    {mode === "Ao ponto" ? "Ponto da casa (ao ponto)" : mode}
                                   </label>
                                 );
                               })}
@@ -4618,8 +4839,8 @@ function ProductDetail({
 
                           <div className="detail-section removal-section">
                             <div className="detail-section-title">
-                              <h3>Remover ingredientes do hambúrguer</h3>
-                              <p>Marque apenas o que você quer tirar do pedido.</p>
+                              <h3>Retirar ingredientes (opcional)</h3>
+                              <p>O pão e a carne permanecem. Retire apenas os acompanhamentos que não quiser.</p>
                             </div>
                             <div className="option-grid compact-options">
                               {removableItems.map((ing) => {
@@ -4653,7 +4874,7 @@ function ProductDetail({
                                 { id: "duplo", name: "Duplo", description: "2 carnes 90g, duplo cheddar e bacon", image: "/assets/products/duplo-burgerc.webp", extraPrice: 8 },
                               ]).map((b) => {
                                 const isSelected = comboBurger2 === b.name;
-                                const extraCost = b.name === "Duplo" ? 8 : b.name === "Agridoce" ? 4 : 0;
+                                const extraCost = burgerChoicePrice(b.name, 2);
                                 const burgerImg = b.image || {
                                   "X-Salada": "/assets/products/x-salada-burgerc.webp",
                                   Cheeseburger: "/assets/products/cheeseburger-burgerc.webp",
@@ -4662,16 +4883,16 @@ function ProductDetail({
                                   Duplo: "/assets/products/duplo-burgerc.webp",
                                 }[b.name] || "/assets/new-direction/doutor-burger.webp";
                                 return (
-                                  <label key={`b2-${b.id || b.name}`} className={isSelected ? "is-selected" : ""} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", borderRadius: "14px", cursor: "pointer" }}>
+                                <label key={`b2-${b.id || b.name}`} className={isSelected ? "is-selected" : ""} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 14px", borderRadius: "14px", cursor: extraCost === null ? "not-allowed" : "pointer" }}>
                                     <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                                      <input name="comboBurger2" type="radio" checked={isSelected} onChange={() => setComboBurger2(b.name)} />
-                                      <img src={burgerImg} alt={b.name} style={{ width: "42px", height: "42px", borderRadius: "8px", objectFit: "cover", flexShrink: 0, border: "1px solid var(--line)" }} />
+                                      <input name="comboBurger2" type="radio" disabled={extraCost === null} checked={isSelected} onChange={() => { setComboBurger2(b.name); setRemovedIngredients2([]); }} />
+                                      <img src={resolveCatalogImage(b.name, burgerImg)} alt={b.name} style={{ width: "42px", height: "42px", borderRadius: "8px", objectFit: "cover", flexShrink: 0, border: "1px solid var(--line)" }} />
                                       <div style={{ textAlign: "left" }}>
                                         <strong style={{ fontSize: "15px", display: "block" }}>{b.name}</strong>
                                         <small style={{ display: "block", color: "#68717d", fontSize: "12px", marginTop: "2px" }}>{b.description}</small>
                                       </div>
                                     </div>
-                                    {extraCost > 0 && <span style={{ fontWeight: 800, color: "#ee8500", fontSize: "13px" }}>+ {money.format(extraCost)}</span>}
+                                  {extraCost === null ? <span className="choice-unavailable">Indisponível</span> : extraCost > 0 && <span className="choice-price">+ {money.format(extraCost)}</span>}
                                   </label>
                                 );
                               })}
@@ -4680,7 +4901,7 @@ function ProductDetail({
 
                           <div className="detail-section meat-choice-2">
                             <div className="detail-section-title">
-                              <h3>Ponto da carne do 2º Burger ({comboBurger2 || "Cheeseburger"})</h3>
+                              <h3>Ponto da carne do 2º Burger{comboBurger2 ? ` (${comboBurger2})` : ""}</h3>
                               <p>Escolha como prefere o 2º burger.</p>
                             </div>
                             <div className="meat-options">
@@ -4689,7 +4910,7 @@ function ProductDetail({
                                 return (
                                   <label key={`m2-${mode}`} className={isSelected ? "is-selected" : ""}>
                                     <input name="meat2" type="radio" checked={isSelected} onChange={() => setMeat2(mode)} />
-                                    {mode}
+                                    {mode === "Ao ponto" ? "Ponto da casa (ao ponto)" : mode}
                                   </label>
                                 );
                               })}
@@ -4698,11 +4919,11 @@ function ProductDetail({
 
                           <div className="detail-section removal-section-2">
                             <div className="detail-section-title">
-                              <h3>Remover ingredientes do 2º Burger ({comboBurger2 || "Cheeseburger"})</h3>
-                              <p>Marque apenas o que você quer tirar do 2º burger.</p>
+                              <h3>Retirar ingredientes do 2º Burger (opcional)</h3>
+                              <p>O pão e a carne permanecem. Retire apenas os acompanhamentos que não quiser.</p>
                             </div>
                             <div className="option-grid compact-options">
-                              {removableItems.map((ing) => {
+                              {removableItems2.map((ing) => {
                                 const isRemoved = (removedIngredients2 || []).includes(ing);
                                 return (
                                   <label key={`rem2-${ing}`} className={isRemoved ? "is-removed" : ""}>
@@ -4725,10 +4946,12 @@ function ProductDetail({
                         <div className="meat-options">
                           {sideOptions.map((side) => {
                             const isSelected = comboSide === side;
+                            const extraCost = sideChoicePrice(side);
                             return (
                               <label key={side} className={isSelected ? "is-selected" : ""}>
-                                <input name="comboSide" type="radio" checked={isSelected} onChange={() => setComboSide(side)} />
-                                {side}
+                                <input name="comboSide" type="radio" disabled={extraCost === null} checked={isSelected} onChange={() => setComboSide(side)} />
+                                <span>{side.replace(/\s*\(\+.*\)$/, "")}</span>
+                                {extraCost === null ? <small className="choice-unavailable">Indisponível</small> : extraCost > 0 && <small className="choice-price">+ {money.format(extraCost)}</small>}
                               </label>
                             );
                           })}
@@ -4772,7 +4995,7 @@ function ProductDetail({
                           return (
                             <label key={mode} className={isSelected ? "is-selected" : ""}>
                               <input name="meat" type="radio" checked={isSelected} onChange={() => setMeat(mode)} />
-                              {mode}
+                              {mode === "Ao ponto" ? "Ponto da casa (ao ponto)" : mode}
                             </label>
                           );
                         })}
@@ -4782,8 +5005,8 @@ function ProductDetail({
 
                   <div className="detail-section removal-section">
                     <div className="detail-section-title">
-                      <h3>Remover ingredientes</h3>
-                      <p>Marque apenas o que você quer tirar do pedido.</p>
+                      <h3>Retirar ingredientes (opcional)</h3>
+                      <p>O pão e a carne permanecem. Retire apenas os acompanhamentos que não quiser.</p>
                     </div>
                     <div className="option-grid compact-options">
                       {removableItems.map((ing) => {
@@ -4801,15 +5024,16 @@ function ProductDetail({
                   {extraOptions.length > 0 && (
                     <div className="detail-section extras-section">
                       <div className="detail-section-title">
-                        <h3>Adicionais do Hambúrguer</h3>
+                        <h3>Adicionais (opcional)</h3>
                         <p>Selecione ingredientes adicionais específicos para o seu burger.</p>
                       </div>
                       <div className="option-grid extras-grid">
-                        {extraOptions.map(([name, price]) => {
+                        {extraOptions.map((option) => {
+                          const { id, name, price } = option;
                           const isSelected = extras.some((item) => item.name === name);
                           return (
                             <label className={`check-row ${isSelected ? "is-selected" : ""}`} key={name}>
-                              <input type="checkbox" checked={isSelected} onChange={() => toggleExtra(name, price)} />
+                              <input type="checkbox" checked={isSelected} onChange={() => toggleExtra(option)} />
                               <span>{name}</span>
                               <strong>{price > 0 ? `+ ${money.format(price)}` : "Grátis"}</strong>
                             </label>
@@ -4819,11 +5043,11 @@ function ProductDetail({
                     </div>
                   )}
 
-                  <label className={`combo-row detail-combo-card ${combo ? "is-selected" : ""}`}>
+                  {comboUpgradeAvailable && <label className={`combo-row detail-combo-card ${combo ? "is-selected" : ""}`}>
                     <input type="checkbox" checked={combo} onChange={(event) => setCombo(event.target.checked)} />
                     <span><strong>Transformar em Combo (Batata + Bebida)</strong><small>Adiciona batata crocante e refrigerante lata 350ml</small></span>
-                    <strong>+ R$ 11,90</strong>
-                  </label>
+                    <strong>+ {money.format(comboUpgradePrice)}</strong>
+                  </label>}
                 </>
               )}
 
@@ -4856,13 +5080,33 @@ function ProductDetail({
                 </div>
               )}
 
-              <label className="note-box"><span>Observações</span><textarea value={note} onChange={(event) => setNote(event.target.value)} maxLength={120} placeholder="Ex.: sem cebola, molho à parte..." /></label>
+              {wizardSteps.length > 0 && (
+                <div className="wizard-navigation">
+                  {wizardIndex > 0 && <button type="button" className="wizard-back" onClick={() => moveWizard(-1)}>← Voltar uma etapa</button>}
+                  {!wizardIsFinal && <button type="button" className="primary-btn wizard-next" disabled={!wizardCanAdvance} onClick={() => moveWizard(1)}>Próximo: {wizardLabels[wizardSteps[wizardIndex + 1]]} →</button>}
+                </div>
+              )}
+              {wizardSteps.length > 0 && (
+                <div className="wizard-choices">
+                  <h3>Suas escolhas</h3>
+                  {isCombo && <p><strong>{isMultiBurgerCombo ? "1º hambúrguer" : "Hambúrguer"}</strong><span>{comboBurger || "Não escolhido"} · {meat === "Ao ponto" ? "Ponto da casa" : meat}</span></p>}
+                  {isMultiBurgerCombo && <p><strong>2º hambúrguer</strong><span>{comboBurger2 || "Não escolhido"} · {meat2 === "Ao ponto" ? "Ponto da casa" : meat2}</span></p>}
+                  {isBurger && <p><strong>Ponto</strong><span>{meat === "Ao ponto" ? "Ponto da casa" : meat}</span></p>}
+                  {removedIngredients.length > 0 && <p><strong>Sem</strong><span>{removedIngredients.join(", ")}</span></p>}
+                  {removedIngredients2.length > 0 && <p><strong>Sem no 2º</strong><span>{removedIngredients2.join(", ")}</span></p>}
+                  {extras.length > 0 && <p><strong>Adicionais</strong><span>{extras.map((item) => item.name).join(", ")}</span></p>}
+                  {isBurger && combo && <p><strong>Completar</strong><span>Batata + bebida</span></p>}
+                  {isCombo && <p><strong>Combo</strong><span>{comboSide} · {comboDrink}</span></p>}
+                </div>
+              )}
+              <label className="note-box"><span>Observações (opcional)</span><textarea value={note} onChange={(event) => setNote(event.target.value)} maxLength={120} placeholder="Ex.: sem cebola, molho à parte..." /></label>
               <aside className="detail-order-summary">
                 <h3>Resumo do pedido</h3>
                 <div><span>Subtotal</span><strong>{money.format(product.price)}</strong></div>
                 {extrasTotal > 0 && <div><span>Extras</span><strong>{money.format(extrasTotal)}</strong></div>}
                 {sideSizePrice > 0 && <div><span>Tamanho ({sideSize})</span><strong>{money.format(sideSizePrice)}</strong></div>}
                 {comboBurgerExtraPrice > 0 && <div><span>Opção Hambúrguer ({comboBurger})</span><strong>{money.format(comboBurgerExtraPrice)}</strong></div>}
+                {secondBurgerExtraPrice > 0 && <div><span>2º Hambúrguer ({comboBurger2})</span><strong>{money.format(secondBurgerExtraPrice)}</strong></div>}
                 {comboSidePrice > 0 && <div><span>Opção Acompanhamento</span><strong>{money.format(comboSidePrice)}</strong></div>}
                 {comboPrice > 0 && <div><span>Combo (Batata + Bebida)</span><strong>{money.format(comboPrice)}</strong></div>}
                 <div className="detail-order-total"><span>Total</span><strong>{money.format(unitPrice * qty)}</strong></div>
@@ -4911,12 +5155,11 @@ function ProductDetail({
                     : `Adicionar ao carrinho - ${money.format(unitPrice * qty)}`;
                   return (
                     <button
-                      className={`primary-btn full ${!isSelectionComplete ? "is-disabled" : ""}`}
-                      onClick={onAdd}
-                      disabled={!isSelectionComplete}
-                      style={!isSelectionComplete ? { opacity: 0.65, cursor: "not-allowed", background: "#949494", borderColor: "#7a7a7a" } : {}}
+                      className={`primary-btn full ${(!wizardIsFinal && !wizardCanAdvance) || (wizardIsFinal && !isSelectionComplete) ? "is-disabled" : ""}`}
+                      onClick={wizardSteps.length && !wizardIsFinal ? () => moveWizard(1) : onAdd}
+                      disabled={wizardSteps.length && !wizardIsFinal ? !wizardCanAdvance : !isSelectionComplete}
                     >
-                      <Icon name="cart" /> {buttonLabel}
+                      {wizardSteps.length && !wizardIsFinal ? `Próximo: ${wizardLabels[wizardSteps[wizardIndex + 1]]} →` : <><Icon name="cart" /> {buttonLabel}</>}
                     </button>
                   );
                 })()}

@@ -8473,3 +8473,37 @@ body.detail-mode .detail-copy > .purchase-bar {
     min-width: 46px !important;
   }
 }
+
+/* The new food photos are 4:3; preserve their full frame in catalog cards. */
+.product-card--burger img,
+.combo-card img,
+.favorite-card--burger img {
+  aspect-ratio: 4 / 3 !important;
+  object-fit: cover !important;
+  object-position: center !important;
+  background: #fff !important;
+}
+
+.product-card--burger img,
+.combo-card img {
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  width: 100% !important;
+}
+
+@media (max-width: 760px) {
+  .product-card--burger {
+    grid-template-columns: 112px minmax(0, 1fr) 48px !important;
+  }
+
+  .product-card--burger img {
+    height: 84px !important;
+    width: 112px !important;
+  }
+
+  .combo-card img {
+    aspect-ratio: 4 / 3 !important;
+    width: calc(100% + 36px) !important;
+  }
+}
