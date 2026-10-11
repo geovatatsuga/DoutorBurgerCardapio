@@ -10,6 +10,8 @@ import QRCode from "qrcode";
 import { buildPixPayload, normalizePixKey } from "./pix";
 import { parseAuthoritativeOrderTotals } from "./orderTotals";
 import { BUSINESS_INFO, storeWhatsappUrl } from "./businessInfo";
+import DeliveryLookup from "./components/DeliveryLookup";
+import { formatDeliveryAddress } from "../supabase/functions/_shared/delivery-zone";
 import "./components/ProductDetail.css";
 
 const money = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
@@ -394,7 +396,7 @@ function mapOrderFromDb(order) {
     dbId: order.id,
     name: order.customer_name,
     phone: order.customer_phone,
-    address: order.fulfillment === "delivery" ? (order.delivery_address?.street || order.delivery_address?.address || "") : "Retirada no Balcao",
+    address: order.fulfillment === "delivery" ? formatDeliveryAddress(order.delivery_address) : "Retirada no Balcao",
     complement: order.delivery_address?.complement || "",
     payment: paymentMethod === "pix" ? "Pix" : paymentMethod === "cash" ? "Dinheiro" : paymentMethod === "debit_card" ? "Cartão de Débito" : paymentMethod === "credit_card" ? "Cartão de Crédito" : "Pago pelo App (iFood)",
     paymentStatus: paymentRecord?.status || "pending",
@@ -540,6 +542,8 @@ export default function App() {
   const [checkoutName, setCheckoutName] = useState("");
   const [checkoutPhone, setCheckoutPhone] = useState("");
   const [checkoutAddress, setCheckoutAddress] = useState("");
+  const [checkoutNumber, setCheckoutNumber] = useState("");
+  const [checkoutPostalAddress, setCheckoutPostalAddress] = useState(null);
   const [checkoutComplement, setCheckoutComplement] = useState("");
   const [checkoutPayment, setCheckoutPayment] = useState("Pix");
   const [checkoutChange, setCheckoutChange] = useState("");
@@ -949,7 +953,6 @@ export default function App() {
         .order("name", { ascending: true });
       if (dbZones) {
         setDeliveryZones(dbZones);
-        setSelectedDeliveryZoneId((currentZoneId) => currentZoneId || dbZones.find((zone) => zone.is_active !== false)?.id || "");
       }
     }
 
@@ -1140,10 +1143,10 @@ export default function App() {
   // Client totals logic
   const selectedProduct = products.find((product) => product.id === selectedId) ?? products[0];
   const subtotal = cart.reduce((sum, item) => sum + item.price * item.qty, 0);
-  const activeDeliveryZones = deliveryZones.filter((zone) => zone.is_active !== false);
-  const selectedDeliveryZone = activeDeliveryZones.find((zone) => zone.id === selectedDeliveryZoneId) || activeDeliveryZones[0] || null;
-  const currentDeliveryFee = selectedDeliveryZone ? centsToMoney(selectedDeliveryZone.delivery_fee_cents) : storeSettings.deliveryFee;
-  const currentMinOrder = selectedDeliveryZone ? centsToMoney(selectedDeliveryZone.min_order_cents) : storeSettings.minOrder;
+  const activeDeliveryZones = useMemo(() => deliveryZones.filter((zone) => zone.is_active !== false), [deliveryZones]);
+  const selectedDeliveryZone = activeDeliveryZones.find((zone) => zone.id === selectedDeliveryZoneId) || null;
+  const currentDeliveryFee = selectedDeliveryZone ? centsToMoney(selectedDeliveryZone.delivery_fee_cents) : 0;
+  const currentMinOrder = selectedDeliveryZone ? centsToMoney(selectedDeliveryZone.min_order_cents) : 0;
   const currentFee = receiveMode === "Entrega" ? currentDeliveryFee : 0;
   const total = subtotal ? subtotal + currentFee : 0;
   const count = cart.reduce((sum, item) => sum + item.qty, 0);
@@ -1381,13 +1384,8 @@ export default function App() {
       setCheckoutError("Por favor, preencha o seu número de WhatsApp.");
       return;
     }
-    if (receiveMode === "Entrega" && !checkoutAddress.trim()) {
-      setCheckoutError("Por favor, preencha o seu endereço de entrega.");
-      return;
-    }
-
-    if (receiveMode === "Entrega" && activeDeliveryZones.length > 0 && !selectedDeliveryZone) {
-      setCheckoutError("Por favor, selecione a area de entrega.");
+    if (receiveMode === "Entrega" && (!checkoutPostalAddress || !selectedDeliveryZone || !checkoutAddress.trim() || !checkoutNumber.trim())) {
+      setCheckoutError("Consulte o CEP e informe rua e número para calcular a entrega.");
       return;
     }
     if (receiveMode === "Entrega" && subtotal < currentMinOrder) {
@@ -1405,6 +1403,8 @@ export default function App() {
       name: checkoutName.trim(),
       phone: checkoutPhone.trim(),
       address: checkoutAddress.trim(),
+      cep: checkoutPostalAddress?.cep || null,
+      number: checkoutNumber.trim(),
       complement: checkoutComplement.trim(),
       zone: selectedDeliveryZone?.id || null,
       payment: checkoutPayment,
@@ -1430,7 +1430,7 @@ export default function App() {
       id: orderId,
       name: checkoutName,
       phone: checkoutPhone,
-      address: receiveMode === "Entrega" ? `${checkoutAddress}${selectedDeliveryZone ? ` - ${selectedDeliveryZone.name}` : ""}` : "Retirada no Balcao",
+      address: receiveMode === "Entrega" ? `${checkoutAddress}, ${checkoutNumber} - ${selectedDeliveryZone.name}, ${checkoutPostalAddress.localidade} - PB, CEP ${checkoutPostalAddress.cep}` : "Retirada no Balcao",
       complement: checkoutComplement,
       payment: paymentMethod,
       paymentStatus: "pending",
@@ -1459,7 +1459,7 @@ export default function App() {
             p_fulfillment: receiveMode === "Entrega" ? "delivery" : "pickup",
             p_customer_name: checkoutName.trim(),
             p_customer_phone: checkoutPhone.trim(),
-            p_delivery_address: receiveMode === "Entrega" ? { street: checkoutAddress.trim(), complement: checkoutComplement.trim() || null, delivery_zone_id: selectedDeliveryZone?.id || null, delivery_zone_name: selectedDeliveryZone?.name || null } : null,
+            p_delivery_address: receiveMode === "Entrega" ? { cep: checkoutPostalAddress.cep, street: checkoutAddress.trim(), number: checkoutNumber.trim(), complement: checkoutComplement.trim() || null } : null,
             p_payment_method: checkoutPayment === "Dinheiro" ? "cash" : checkoutPayment === "Pix" ? "pix" : checkoutPayment === "Cartão de Débito" ? "debit_card" : "credit_card",
             p_items: cart.map((item) => ({
               product_id: item.dbId || item.id,
@@ -1487,7 +1487,10 @@ export default function App() {
         sessionStorage.removeItem("doutor_pending_order_request");
         orderRequestKeyRef.current = null;
       } catch (error) {
-        setCheckoutError(error.message || "Não foi possível criar o pedido.");
+        const response = error?.context && typeof error.context.json === "function"
+          ? await error.context.json().catch(() => null)
+          : null;
+        setCheckoutError(response?.error || error.message || "Não foi possível criar o pedido.");
         clientOrderSubmitLock.current = false;
         return;
       }
@@ -3886,6 +3889,7 @@ _Pedido enviado via Cardápio Digital!_`;
               onFinish={() => setFlow("delivery")}
               storeSettings={storeSettings}
               currentFee={currentFee}
+              deliveryQuoted={receiveMode !== "Entrega" || Boolean(selectedDeliveryZone)}
             />
           )}
         </main>
@@ -3954,6 +3958,10 @@ _Pedido enviado via Cardápio Digital!_`;
         setCheckoutPhone={setCheckoutPhone}
         checkoutAddress={checkoutAddress}
         setCheckoutAddress={setCheckoutAddress}
+        checkoutNumber={checkoutNumber}
+        setCheckoutNumber={setCheckoutNumber}
+        checkoutPostalAddress={checkoutPostalAddress}
+        setCheckoutPostalAddress={setCheckoutPostalAddress}
         checkoutComplement={checkoutComplement}
         setCheckoutComplement={setCheckoutComplement}
         checkoutPayment={checkoutPayment}
@@ -4307,7 +4315,7 @@ function Combos({ products, openProduct, isStoreOpen }) {
   );
 }
 
-function CartPanel({ cart, subtotal, total, receiveMode, setReceiveMode, updateQty, onBack, onFinish, storeSettings, currentFee }) {
+function CartPanel({ cart, subtotal, total, receiveMode, setReceiveMode, updateQty, onBack, onFinish, storeSettings, currentFee, deliveryQuoted }) {
   return (
     <aside className="cart-panel is-open" id="cartPanel" aria-label="Carrinho">
       <div className="panel-card">
@@ -4348,9 +4356,9 @@ function CartPanel({ cart, subtotal, total, receiveMode, setReceiveMode, updateQ
           <h3>Resumo do pedido</h3>
           <div><span>Subtotal</span><strong>{money.format(subtotal)}</strong></div>
           {receiveMode === "Entrega" && (
-            <div><span>Taxa de entrega</span><strong>{money.format(currentFee)}</strong></div>
+            <div><span>Taxa de entrega</span><strong>{deliveryQuoted ? money.format(currentFee) : "Calculada no checkout"}</strong></div>
           )}
-          <div className="total"><span>Total</span><strong>{money.format(total)}</strong></div>
+          <div className="total"><span>{deliveryQuoted ? "Total" : "Subtotal"}</span><strong>{money.format(total)}</strong></div>
         </div>
         {cart.length > 0 && (
           <div className="cart-checkout" style={{ borderTop: "1px solid var(--line)", paddingTop: "20px" }}>
@@ -5276,6 +5284,10 @@ function FlowDrawer({
   setCheckoutPhone,
   checkoutAddress,
   setCheckoutAddress,
+  checkoutNumber,
+  setCheckoutNumber,
+  checkoutPostalAddress,
+  setCheckoutPostalAddress,
   checkoutComplement,
   setCheckoutComplement,
   checkoutPayment,
@@ -5331,6 +5343,7 @@ function FlowDrawer({
   if (!flow) return null;
 
   const showProgress = flow === "delivery" || flow === "checkout";
+  const deliveryReady = receiveMode !== "Entrega" || Boolean(checkoutPostalAddress && selectedDeliveryZone && checkoutAddress.trim() && checkoutNumber.trim());
 
   return (
     <div className="drawer is-open" id="flowDrawer" aria-hidden="false">
@@ -5364,11 +5377,11 @@ function FlowDrawer({
                 aria-label="Passo 2: Pagamento"
                 aria-current={checkoutStep === 2 ? "step" : undefined}
                 onClick={() => {
-                  if (receiveMode === "Entrega" && !checkoutAddress.trim()) return;
+                  if (!deliveryReady) return;
                   setCheckoutStep(2);
                 }}
-                disabled={checkoutStep < 2 && (receiveMode === "Entrega" && !checkoutAddress.trim())}
-                style={{ cursor: checkoutStep >= 2 || (receiveMode === "Entrega" && checkoutAddress.trim()) ? "pointer" : "default", width: "36px", height: "36px", borderRadius: "50%", background: checkoutStep >= 2 ? "var(--accent)" : "#fff", border: `2px solid ${checkoutStep >= 2 ? "var(--accent)" : "#dee2e6"}`, color: checkoutStep >= 2 ? "#fff" : "#6c757d", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold", fontSize: "14px", transition: "all 0.3s ease" }}
+                disabled={!deliveryReady}
+                style={{ cursor: deliveryReady ? "pointer" : "default", width: "36px", height: "36px", borderRadius: "50%", background: checkoutStep >= 2 ? "var(--accent)" : "#fff", border: `2px solid ${checkoutStep >= 2 ? "var(--accent)" : "#dee2e6"}`, color: checkoutStep >= 2 ? "#fff" : "#6c757d", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold", fontSize: "14px", transition: "all 0.3s ease" }}
               >
                 {checkoutStep > 2 ? "✓" : "2"}
               </button>
@@ -5429,39 +5442,37 @@ function FlowDrawer({
 
             {receiveMode === "Entrega" && (
               <div className="delivery-fields" style={{ animation: "fadeIn 0.3s ease", display: "flex", flexDirection: "column", gap: "14px", marginTop: "10px" }}>
-                {deliveryZones.length > 0 && (
-                  <label className="field" style={{ margin: 0 }}>
-                    <span style={{ fontWeight: "800", fontSize: "12px", textTransform: "uppercase", color: "#495057" }}>
-                      Área de entrega
-                    </span>
-                    <select
-                      value={selectedDeliveryZoneId}
-                      onChange={(e) => { setSelectedDeliveryZoneId(e.target.value); if (setCheckoutError) setCheckoutError(""); }}
-                      style={{ width: "100%", height: "52px", borderRadius: "12px", border: "1px solid var(--line)", padding: "0 16px", fontSize: "14px", background: "#fff" }}
-                    >
-                      {deliveryZones.map((zone) => (
-                        <option key={zone.id} value={zone.id}>
-                          {zone.name}{zone.zone_label ? ` · ${zone.zone_label}` : ""} - taxa {money.format(centsToMoney(zone.delivery_fee_cents))}
-                        </option>
-                      ))}
-                    </select>
-                    {selectedDeliveryZone && (
-                      <small style={{ display: "block", marginTop: "6px", color: "#6c757d", fontWeight: 700 }}>
-                        Taxa: {money.format(currentFee)}{selectedDeliveryZone.delivery_time_label ? ` · Tempo médio: ${selectedDeliveryZone.delivery_time_label}` : ""} · Pedido mínimo: {money.format(currentMinOrder)}
-                      </small>
-                    )}
-                  </label>
-                )}
+                <DeliveryLookup
+                  zones={deliveryZones}
+                  selectedZone={selectedDeliveryZone}
+                  onReset={() => {
+                    setSelectedDeliveryZoneId("");
+                    setCheckoutPostalAddress(null);
+                    setCheckoutAddress("");
+                    setCheckoutNumber("");
+                    setCheckoutError("");
+                  }}
+                  onResolved={(address, zone) => {
+                    setCheckoutPostalAddress(address);
+                    setSelectedDeliveryZoneId(zone.id);
+                    setCheckoutAddress(address.logradouro || "");
+                    setCheckoutError("");
+                  }}
+                />
                 <label className="field" style={{ margin: 0 }}>
                   <span style={{ fontWeight: "800", fontSize: "12px", textTransform: "uppercase", color: "#495057", display: "flex", alignItems: "center", gap: "6px" }}>
-                    📍 Endereço de entrega
+                    Rua
                   </span>
                   <input 
                     value={checkoutAddress} 
                     onChange={(e) => { setCheckoutAddress(e.target.value); if (setCheckoutError) setCheckoutError(""); }} 
-                    placeholder="Rua, número, bairro" 
+                    readOnly={Boolean(checkoutPostalAddress?.logradouro)}
+                    placeholder="Preenchida pelo CEP"
                     style={{ width: "100%", height: "52px", borderRadius: "12px", border: "1px solid var(--line)", padding: "0 16px", fontSize: "14px" }}
                   />
+                </label>
+                <label className="field" style={{ margin: 0 }}>Número
+                  <input value={checkoutNumber} onChange={(e) => setCheckoutNumber(e.target.value.slice(0, 20))} placeholder="Ex.: 116-B" autoComplete="address-line2" maxLength={20} />
                 </label>
                 <label className="field" style={{ margin: 0 }}>
                   <span style={{ fontWeight: "800", fontSize: "12px", textTransform: "uppercase", color: "#495057" }}>
@@ -5488,8 +5499,8 @@ function FlowDrawer({
               type="button"
               className="primary-btn full" 
               onClick={() => {
-                if (receiveMode === "Entrega" && !checkoutAddress.trim()) {
-                  setCheckoutError("Por favor, preencha o seu endereço de entrega.");
+                if (!deliveryReady) {
+                  setCheckoutError("Consulte o CEP e informe rua e número para calcular a entrega.");
                   return;
                 }
                 if (receiveMode === "Entrega" && subtotal < currentMinOrder) {
