@@ -9,6 +9,7 @@ import { getRemovableIngredients } from "./removableIngredients";
 import QRCode from "qrcode";
 import { buildPixPayload, normalizePixKey } from "./pix";
 import { parseAuthoritativeOrderTotals } from "./orderTotals";
+import { BUSINESS_INFO, storeWhatsappUrl } from "./businessInfo";
 import "./components/ProductDetail.css";
 
 const money = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
@@ -462,15 +463,15 @@ export default function App() {
       const local = localStorage.getItem("doutor_settings");
       if (local) {
         const { pixKey: _unusedPixKey, ...settings } = JSON.parse(local);
-        return settings;
+        return { ...settings, phone: BUSINESS_INFO.whatsapp, address: BUSINESS_INFO.address };
       }
       return {
         name: "Doutor Burger",
-        phone: "(83) 99966-2590",
+        phone: BUSINESS_INFO.whatsapp,
         minOrder: 20,
         deliveryTime: "35-45 min",
         deliveryFee: 6.9,
-        address: "Rua Clotilde Torres, 116-B, Casa - Alto do Mateus, Joao Pessoa - PB, CEP 58090-240",
+        address: BUSINESS_INFO.address,
         openDays: [0, 2, 3, 4, 5, 6],
         openHour: "18:00",
         closeHour: "23:30",
@@ -478,11 +479,11 @@ export default function App() {
     } catch {
       return {
         name: "Doutor Burger",
-        phone: "(83) 99966-2590",
+        phone: BUSINESS_INFO.whatsapp,
         minOrder: 20,
         deliveryTime: "35-45 min",
         deliveryFee: 6.9,
-        address: "Rua Clotilde Torres, 116-B, Casa - Alto do Mateus, Joao Pessoa - PB, CEP 58090-240",
+        address: BUSINESS_INFO.address,
         openDays: [0, 2, 3, 4, 5, 6],
         openHour: "18:00",
         closeHour: "23:30",
@@ -855,8 +856,8 @@ export default function App() {
       setStoreSettings((current) => ({
         ...current,
         name: store.name,
-        phone: store.phone || current.phone,
-        address: store.address || current.address,
+        phone: store.phone || BUSINESS_INFO.whatsapp,
+        address: store.address || BUSINESS_INFO.address,
         minOrder: centsToMoney(store.min_order_cents),
         deliveryFee: centsToMoney(store.delivery_fee_cents),
         deliveryTime: store.delivery_time_label || current.deliveryTime,
@@ -943,7 +944,7 @@ export default function App() {
 
       const { data: dbZones } = await supabase
         .from("delivery_zones")
-        .select("id,name,delivery_fee_cents,min_order_cents,is_active")
+        .select("id,name,zone_label,delivery_time_label,delivery_fee_cents,min_order_cents,is_active")
         .eq("store_id", store.id)
         .order("name", { ascending: true });
       if (dbZones) {
@@ -1509,7 +1510,6 @@ export default function App() {
     }
 
     // Format WhatsApp message
-    const cleanPhone = storeSettings.phone.replace(/\D/g, "");
     const itemsText = newOrder.items
       .map(item => `• *${item.qty}x ${item.name}* (${money.format(item.price)})${item.notes ? `\n   └ Obs: _${item.notes}_` : ""}`)
       .join("\n");
@@ -1521,7 +1521,7 @@ export default function App() {
 *Cliente:* ${newOrder.name}
 *WhatsApp:* ${checkoutPhone}
 *Modo:* ${receiveMode}
-${receiveMode === "Entrega" ? `*Endereço:* ${newOrder.address}\n*Complemento:* ${newOrder.complement || "Não informado"}` : "*Local de Retirada:* Balcão"}
+${receiveMode === "Entrega" ? `*Endereço:* ${newOrder.address}\n*Complemento:* ${newOrder.complement || "Não informado"}` : `*Local de Retirada:* ${BUSINESS_INFO.address}`}
 *Pagamento:* ${newOrder.payment}
 
 *Itens:*
@@ -1533,8 +1533,7 @@ ${itemsText}
 
 _Pedido enviado via Cardápio Digital!_`;
 
-    const encodedText = encodeURIComponent(message);
-    const whatsappUrl = `https://wa.me/55${cleanPhone}?text=${encodedText}`;
+    const whatsappUrl = storeWhatsappUrl(storeSettings.phone, message);
 
     if (checkoutPayment !== "Pix") window.open(whatsappUrl, "_blank");
   }
@@ -2244,7 +2243,7 @@ _Pedido enviado via Cardápio Digital!_`;
           .from("delivery_zones")
           .update(payload)
           .eq("id", editingZoneId)
-          .select("id,name,delivery_fee_cents,min_order_cents,is_active")
+          .select("id,name,zone_label,delivery_time_label,delivery_fee_cents,min_order_cents,is_active")
           .single();
         if (error) {
           alert(error.message);
@@ -2255,7 +2254,7 @@ _Pedido enviado via Cardápio Digital!_`;
         const { data, error } = await supabase
           .from("delivery_zones")
           .upsert(payload, { onConflict: "store_id,name" })
-          .select("id,name,delivery_fee_cents,min_order_cents,is_active")
+          .select("id,name,zone_label,delivery_time_label,delivery_fee_cents,min_order_cents,is_active")
           .single();
         if (error) {
           alert(error.message);
@@ -2287,7 +2286,7 @@ _Pedido enviado via Cardápio Digital!_`;
         .from("delivery_zones")
         .update({ is_active: !zone.is_active })
         .eq("id", zone.id)
-        .select("id,name,delivery_fee_cents,min_order_cents,is_active")
+        .select("id,name,zone_label,delivery_time_label,delivery_fee_cents,min_order_cents,is_active")
         .single();
       if (error) {
         alert(error.message);
@@ -3730,14 +3729,12 @@ _Pedido enviado via Cardápio Digital!_`;
                 </div>
 
                 {receiptType === "fiscal" ? (
-                  /* COMPROVANTE DO CLIENTE - MEI */
+                  /* COMPROVANTE DO CLIENTE */
                   <div className="thermal-receipt" id="printableReceipt">
                     <h2 style={{ fontSize: "15px", textAlign: "center", textTransform: "uppercase", margin: "0 0 4px 0" }}>DOUTOR BURGER</h2>
-                    <p className="center" style={{ fontSize: "11px", margin: "2px 0" }}>CNPJ: 67.929.090/0001-70</p>
-                    <p className="center" style={{ fontSize: "10px", margin: "2px 0" }}>MEI - Proprietario de lanchonete</p>
-                    <p className="center" style={{ fontSize: "10px", margin: "2px 0" }}>CNAE 5611-2/03 - Lanchonetes e similares</p>
-                    <p className="center" style={{ fontSize: "10px", margin: "2px 0" }}>Rua Clotilde Torres, 116-B, Casa</p>
-                    <p className="center" style={{ fontSize: "10px", margin: "2px 0" }}>Alto do Mateus - Joao Pessoa/PB - CEP 58090-240</p>
+                    <p className="center" style={{ fontSize: "10px", margin: "2px 0" }}>{BUSINESS_INFO.legalName}</p>
+                    <p className="center" style={{ fontSize: "11px", margin: "2px 0" }}>CNPJ: {BUSINESS_INFO.cnpj}</p>
+                    <p className="center" style={{ fontSize: "10px", margin: "2px 0" }}>{BUSINESS_INFO.address}</p>
                     <hr style={{ borderStyle: "dashed" }} />
                     <p className="center" style={{ fontSize: "11px", fontWeight: "bold", margin: "4px 0" }}>COMPROVANTE DE PEDIDO</p>
                     <p className="center" style={{ fontSize: "9px", margin: "2px 0" }}>Documento sem valor fiscal</p>
@@ -4058,9 +4055,8 @@ _Pedido enviado via Cardápio Digital!_`;
   );
 }
 
-function Header({ count, onHome, onCart, onTrack, currentClientOrder, isStoreOpen, storeSettings, deliveryZones }) {
-  const zoneNames = deliveryZones.map((zone) => zone.name).filter(Boolean);
-  const locationLabel = zoneNames.length ? zoneNames.join(", ") : storeSettings.address?.split("-")[0]?.trim() || "Areas de entrega";
+function Header({ count, onHome, onCart, onTrack, currentClientOrder, isStoreOpen, storeSettings }) {
+  const locationLabel = BUSINESS_INFO.location;
   const displayStoreName = (storeSettings.name || "BurgerC").replace(/([a-z])([A-Z])/g, "$1 $2");
   return (
     <header className="topbar">
@@ -5425,6 +5421,12 @@ function FlowDrawer({
               </button>
             </div>
 
+            {receiveMode === "Retirada" && (
+              <p style={{ margin: "0 0 12px", fontSize: "14px", lineHeight: 1.5 }}>
+                <strong>Endereço para retirada:</strong> {BUSINESS_INFO.address}
+              </p>
+            )}
+
             {receiveMode === "Entrega" && (
               <div className="delivery-fields" style={{ animation: "fadeIn 0.3s ease", display: "flex", flexDirection: "column", gap: "14px", marginTop: "10px" }}>
                 {deliveryZones.length > 0 && (
@@ -5439,13 +5441,13 @@ function FlowDrawer({
                     >
                       {deliveryZones.map((zone) => (
                         <option key={zone.id} value={zone.id}>
-                          {zone.name} - taxa {money.format(centsToMoney(zone.delivery_fee_cents))}
+                          {zone.name}{zone.zone_label ? ` · ${zone.zone_label}` : ""} - taxa {money.format(centsToMoney(zone.delivery_fee_cents))}
                         </option>
                       ))}
                     </select>
                     {selectedDeliveryZone && (
                       <small style={{ display: "block", marginTop: "6px", color: "#6c757d", fontWeight: 700 }}>
-                        Taxa: {money.format(currentFee)} - Pedido mínimo: {money.format(currentMinOrder)}
+                        Taxa: {money.format(currentFee)}{selectedDeliveryZone.delivery_time_label ? ` · Tempo médio: ${selectedDeliveryZone.delivery_time_label}` : ""} · Pedido mínimo: {money.format(currentMinOrder)}
                       </small>
                     )}
                   </label>
@@ -5702,11 +5704,8 @@ function FlowDrawer({
                 )}
                 <p>Depois de pagar, avise a loja e envie o comprovante pelo WhatsApp. O pedido só será marcado como pago após conferência no extrato.</p>
                 <button className="primary-btn" type="button" onClick={() => {
-                  const digits = String(storeSettings.phone || "").replace(/\D/g, "");
-                  if (!digits) return;
-                  const number = digits.startsWith("55") ? digits : `55${digits}`;
                   const message = `Olá! Fiz o Pix do pedido ${currentOrder.id}, no valor de ${money.format(currentOrder.total)}. Vou enviar o comprovante para conferência.`;
-                  window.open(`https://wa.me/${number}?text=${encodeURIComponent(message)}`, "_blank", "noopener,noreferrer");
+                  window.open(storeWhatsappUrl(storeSettings.phone, message), "_blank", "noopener,noreferrer");
                 }}>Já paguei: avisar a loja</button>
               </section>
             )}
@@ -5903,8 +5902,7 @@ function TrackOrderSearchForm({ onClose, onOrderFound }) {
 }
 
 function Footer({ storeSettings, onOpenAbout, onOpenFaq, onOpenPrivacy, onOpenTerms }) {
-  const whatsappNumber = storeSettings?.phone ? storeSettings.phone.replace(/\D/g, "") : "83999662590";
-  const whatsappUrl = `https://wa.me/55${whatsappNumber}`;
+  const whatsappUrl = storeWhatsappUrl(storeSettings?.phone);
 
   return (
     <footer className="site-footer" style={{ display: "flex", flexDirection: "column", gap: "16px", padding: "24px 28px", background: "rgba(255, 255, 255, 0.95)", border: "1px solid #f1dec3", borderRadius: "24px", marginTop: "24px" }}>
@@ -5922,7 +5920,7 @@ function Footer({ storeSettings, onOpenAbout, onOpenFaq, onOpenPrivacy, onOpenTe
             Sobre nós
           </button>
           <a href={whatsappUrl} target="_blank" rel="noreferrer" style={{ color: "#25D366", fontWeight: 800, fontSize: "13px", display: "flex", alignItems: "center", gap: "6px", textDecoration: "none" }}>
-            WhatsApp ({storeSettings?.phone || "(83) 99966-2590"})
+            WhatsApp {storeSettings?.phone || BUSINESS_INFO.whatsapp}
           </a>
           <button type="button" onClick={onOpenFaq} style={{ background: "none", border: "none", color: "#68717d", fontWeight: 800, fontSize: "13px", cursor: "pointer" }}>
             Dúvidas frequentes
@@ -5941,9 +5939,9 @@ function Footer({ storeSettings, onOpenAbout, onOpenFaq, onOpenPrivacy, onOpenTe
 
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "12px", width: "100%", fontSize: "12px", color: "#68717d" }}>
         <div>
-          <strong style={{ color: "#2c3036" }}>Doutor Burger Lanchonete LTDA</strong> · CNPJ: <strong>67.929.090/0001-70</strong>
+          <strong style={{ color: "#2c3036" }}>{BUSINESS_INFO.legalName}</strong> · CNPJ: <strong>{BUSINESS_INFO.cnpj}</strong>
           <span style={{ display: "block", marginTop: "2px", fontSize: "11px", color: "#8a94a0" }}>
-            {storeSettings?.address || "Rua Clotilde Torres, 116-B, Casa - Alto do Mateus, João Pessoa - PB, CEP 58090-240"}
+            {BUSINESS_INFO.location}
           </span>
         </div>
         <div style={{ textAlign: "right" }}>
@@ -5957,8 +5955,7 @@ function Footer({ storeSettings, onOpenAbout, onOpenFaq, onOpenPrivacy, onOpenTe
 
 function AboutModal({ isOpen, onClose, storeSettings }) {
   if (!isOpen) return null;
-  const whatsappNumber = storeSettings?.phone ? storeSettings.phone.replace(/\D/g, "") : "83999662590";
-  const whatsappUrl = `https://wa.me/55${whatsappNumber}`;
+  const whatsappUrl = storeWhatsappUrl(storeSettings?.phone);
 
   return (
     <div className="drawer is-open" style={{ zIndex: 9999 }}>
@@ -5995,7 +5992,7 @@ function AboutModal({ isOpen, onClose, storeSettings }) {
               </div>
               <div>
                 <strong style={{ display: "block", color: "#1e293b", fontSize: "14px" }}>Endereço da Lanchonete</strong>
-                <span style={{ color: "#64748b", fontSize: "13px" }}>{storeSettings?.address || "Rua Clotilde Torres, 116-B, Casa - Alto do Mateus, João Pessoa - PB, CEP 58090-240"}</span>
+                <span style={{ color: "#64748b", fontSize: "13px" }}>{BUSINESS_INFO.address}</span>
               </div>
             </div>
 
@@ -6005,7 +6002,7 @@ function AboutModal({ isOpen, onClose, storeSettings }) {
               </div>
               <div>
                 <strong style={{ display: "block", color: "#1e293b", fontSize: "14px" }}>Registro Oficial & CNPJ</strong>
-                <span style={{ color: "#64748b", fontSize: "13px", fontWeight: 700 }}>67.929.090/0001-70</span>
+                <span style={{ color: "#64748b", fontSize: "13px", fontWeight: 700 }}>{BUSINESS_INFO.cnpj}</span>
               </div>
             </div>
 
@@ -6026,7 +6023,7 @@ function AboutModal({ isOpen, onClose, storeSettings }) {
               <div>
                 <strong style={{ display: "block", color: "#1e293b", fontSize: "14px" }}>Atendimento no WhatsApp</strong>
                 <a href={whatsappUrl} target="_blank" rel="noreferrer" style={{ color: "#25D366", fontWeight: "800", textDecoration: "none", fontSize: "14px", display: "inline-flex", alignItems: "center", gap: "4px" }}>
-                  {storeSettings?.phone || "(83) 99966-2590"} (Clique para conversar)
+                  {storeSettings?.phone || BUSINESS_INFO.whatsapp} (Clique para conversar)
                 </a>
               </div>
             </div>
@@ -6052,7 +6049,7 @@ function FaqModal({ isOpen, onClose, storeSettings }) {
     },
     {
       q: "Quais as formas de pagamento aceitas?",
-      a: "Aceitamos Pix (com código de cópia e cola / QR Code gerado automaticamente), Cartão de Crédito e Débito (na maquininha com o entregador) e Dinheiro (você pode informar se precisa de troco ao finalizar o pedido)."
+      a: "Aceitamos Pix, Cartão de Crédito e Débito na maquininha e Dinheiro. O QR Pix aparece após o pedido somente quando estiver habilitado pela loja; caso contrário, a equipe apresenta o Pix na entrega ou retirada."
     },
     {
       q: "Como funcionam os Combos de Hambúrguer?",
@@ -6064,11 +6061,11 @@ function FaqModal({ isOpen, onClose, storeSettings }) {
     },
     {
       q: "Posso fazer o pedido para retirar no local?",
-      a: "Com certeza! Ao preencher seus dados de finalização, basta selecionar a opção 'Retirada no Balcão'. Assim você não paga taxa de entrega e retira direto em nossa cozinha no Alto do Mateus."
+      a: `Com certeza! Ao selecionar retirada, você não paga taxa de entrega. Retire seu pedido em ${BUSINESS_INFO.address}.`
     },
     {
       q: "Como entrar em contato com a lanchonete?",
-      a: `Você pode entrar em contato direto pelo nosso WhatsApp ${storeSettings?.phone || "(83) 99966-2590"}. Nossa equipe está sempre pronta para te atender!`
+      a: `Você pode entrar em contato direto pelo nosso WhatsApp ${storeSettings?.phone || BUSINESS_INFO.whatsapp}. Nossa equipe está sempre pronta para te atender!`
     }
   ];
 
@@ -6132,7 +6129,7 @@ function PrivacyPolicyModal({ isOpen, onClose, storeSettings }) {
 
         <div style={{ display: "flex", flexDirection: "column", gap: "14px", fontSize: "13px", color: "#334155", lineHeight: 1.6 }}>
           <p>
-            <strong>Doutor Burger Lanchonete LTDA</strong> (CNPJ: <strong>67.929.090/0001-70</strong>), localizada em {storeSettings?.address || "João Pessoa - PB"}, respeita a sua privacidade e está compromissada com a proteção dos seus dados pessoais nos termos da Lei Geral de Proteção de Dados (Lei nº 13.709/2018 - LGPD).
+            <strong>{BUSINESS_INFO.legalName}</strong> (CNPJ: <strong>{BUSINESS_INFO.cnpj}</strong>), localizada em {BUSINESS_INFO.location}, respeita a sua privacidade e está compromissada com a proteção dos seus dados pessoais nos termos da Lei Geral de Proteção de Dados (Lei nº 13.709/2018 - LGPD).
           </p>
 
           <div style={{ background: "#f8fafc", padding: "14px", borderRadius: "12px", border: "1px solid #e2e8f0" }}>
@@ -6145,7 +6142,7 @@ function PrivacyPolicyModal({ isOpen, onClose, storeSettings }) {
           <div style={{ background: "#f8fafc", padding: "14px", borderRadius: "12px", border: "1px solid #e2e8f0" }}>
             <strong style={{ color: "#1e293b", display: "block", marginBottom: "4px" }}>2. Uso dos Dados & Telemetria Legítima</strong>
             <p style={{ margin: 0 }}>
-              Seus dados são utilizados estritamente para comunicar o status do pedido via WhatsApp, organizar as rotas de entrega e emitir comprovantes fiscais. Armazenamos apenas dados essenciais via cookies e local storage para manter seu carrinho salvo.
+              Seus dados são utilizados para comunicar o status do pedido via WhatsApp, organizar as rotas de entrega e emitir comprovantes de pedido. Armazenamos dados essenciais via cookies e local storage para manter seu carrinho salvo.
             </p>
           </div>
 
@@ -6159,7 +6156,7 @@ function PrivacyPolicyModal({ isOpen, onClose, storeSettings }) {
           <div style={{ background: "#fffdf8", padding: "14px", borderRadius: "12px", border: "1px solid #f1dec3" }}>
             <strong style={{ color: "#ee8500", display: "block", marginBottom: "4px" }}>4. Direitos do Titular de Dados</strong>
             <p style={{ margin: 0 }}>
-              Você pode solicitar a alteração ou exclusão definitiva do seu cadastro de clientes a qualquer momento entrando em contato direto com nosso encarregado via WhatsApp: {storeSettings?.phone || "(83) 99966-2590"}.
+              Você pode solicitar a alteração ou exclusão definitiva do seu cadastro de clientes a qualquer momento entrando em contato direto com nosso encarregado via WhatsApp: {storeSettings?.phone || BUSINESS_INFO.whatsapp}.
             </p>
           </div>
         </div>
@@ -6209,7 +6206,7 @@ function TermsModal({ isOpen, onClose, storeSettings }) {
           <div style={{ background: "#f8fafc", padding: "14px", borderRadius: "12px", border: "1px solid #e2e8f0" }}>
             <strong style={{ color: "#1e293b", display: "block", marginBottom: "4px" }}>3. Pagamentos na Entrega ou Retirada</strong>
             <p style={{ margin: 0 }}>
-              O pagamento pode ser efetuado via Pix gerado na tela, cartão (crédito/débito na maquininha do motoboy) ou dinheiro (informando troco). O pedido é liberado para preparo assim que confirmado pelo atendente.
+              O pagamento pode ser efetuado via Pix apresentado pela loja ou, quando habilitado, por QR após o pedido; também aceitamos cartão (crédito/débito na maquininha) e dinheiro (informando troco). O pagamento só é marcado como recebido após conferência pela equipe.
             </p>
           </div>
         </div>
