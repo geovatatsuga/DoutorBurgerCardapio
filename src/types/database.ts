@@ -192,32 +192,38 @@ export type Database = {
         Row: {
           created_at: string
           delivery_fee_cents: number
+          delivery_time_label: string | null
           id: string
           is_active: boolean
           min_order_cents: number
           name: string
           store_id: string
           updated_at: string
+          zone_label: string | null
         }
         Insert: {
           created_at?: string
           delivery_fee_cents?: number
+          delivery_time_label?: string | null
           id?: string
           is_active?: boolean
           min_order_cents?: number
           name: string
           store_id: string
           updated_at?: string
+          zone_label?: string | null
         }
         Update: {
           created_at?: string
           delivery_fee_cents?: number
+          delivery_time_label?: string | null
           id?: string
           is_active?: boolean
           min_order_cents?: number
           name?: string
           store_id?: string
           updated_at?: string
+          zone_label?: string | null
         }
         Relationships: [
           {
