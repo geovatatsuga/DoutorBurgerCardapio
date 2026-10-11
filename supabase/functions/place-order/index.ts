@@ -1,4 +1,5 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { findDeliveryZone, normalizePlace, onlyCepDigits, type PostalAddress } from "../_shared/delivery-zone.ts";
 
 const allowedOrigins = new Set([
   "https://doutor-burger-cardapio.vercel.app",
@@ -159,12 +160,64 @@ Deno.serve(async (request) => {
   }
   if (!allowed) return json({ error: "Muitos pedidos deste endereço. Aguarde alguns minutos e tente novamente." }, 429, origin);
 
+  let deliveryAddress: Record<string, unknown> | null = null;
+  if (payload.p_fulfillment === "delivery") {
+    const submitted = payload.p_delivery_address;
+    if (!submitted || typeof submitted !== "object" || Array.isArray(submitted)) {
+      return json({ error: "Informe o CEP, a rua e o número da entrega." }, 400, origin);
+    }
+    const input = submitted as Record<string, unknown>;
+    const cep = onlyCepDigits(input.cep);
+    const street = typeof input.street === "string" ? input.street.trim() : "";
+    const number = typeof input.number === "string" ? input.number.trim() : "";
+    if (cep.length !== 8 || street.length < 3 || street.length > 160 || !number || number.length > 20) {
+      return json({ error: "Confira o CEP, a rua e o número da entrega." }, 400, origin);
+    }
+
+    let postal: PostalAddress;
+    try {
+      const response = await fetch(`https://viacep.com.br/ws/${cep}/json/`, { signal: AbortSignal.timeout(5000) });
+      if (!response.ok) throw new Error("postal lookup failed");
+      postal = await response.json();
+    } catch {
+      return json({ error: "Não foi possível validar o CEP agora. Tente novamente." }, 503, origin);
+    }
+    if (postal.erro || onlyCepDigits(postal.cep) !== cep ||
+        (postal.logradouro && normalizePlace(postal.logradouro) !== normalizePlace(street))) {
+      return json({ error: "O endereço não corresponde ao CEP informado." }, 400, origin);
+    }
+
+    const { data: zones, error: zonesError } = await admin
+      .from("delivery_zones")
+      .select("id,name,is_active")
+      .eq("store_id", payload.p_store_id)
+      .eq("is_active", true);
+    if (zonesError) {
+      console.error("Delivery zone lookup failed:", zonesError.message);
+      return json({ error: "Não foi possível calcular a entrega agora." }, 503, origin);
+    }
+    const zone = findDeliveryZone(postal, zones || []);
+    if (!zone) return json({ error: "Ainda não entregamos neste CEP. Escolha retirada ou consulte a loja." }, 400, origin);
+
+    deliveryAddress = {
+      cep,
+      street: String(postal.logradouro || street),
+      number,
+      neighborhood: postal.bairro,
+      city: postal.localidade,
+      uf: postal.uf,
+      complement: typeof input.complement === "string" ? input.complement.trim().slice(0, 160) || null : null,
+      delivery_zone_id: zone.id,
+      delivery_zone_name: zone.name,
+    };
+  }
+
   const { data: orderId, error } = await admin.rpc("place_order", {
     p_store_id: payload.p_store_id,
     p_fulfillment: payload.p_fulfillment,
     p_customer_name: payload.p_customer_name.trim(),
     p_customer_phone: payload.p_customer_phone.trim(),
-    p_delivery_address: payload.p_delivery_address ?? null,
+    p_delivery_address: deliveryAddress,
     p_payment_method: payload.p_payment_method,
     p_items: items,
     p_notes: typeof payload.p_notes === "string" ? payload.p_notes.slice(0, 500) : null,

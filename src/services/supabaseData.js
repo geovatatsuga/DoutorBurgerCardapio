@@ -1,6 +1,7 @@
 import { isSupabaseConfigured, supabase } from "../lib/supabase";
 
 import { resolveCatalogImage } from "../catalogImages";
+import { formatDeliveryAddress } from "../../supabase/functions/_shared/delivery-zone";
 
 export const STORE_ID = "11111111-1111-4111-8111-111111111111";
 
@@ -64,7 +65,7 @@ export function mapOrder(row) {
     displayId: row.order_number ? `#${row.order_number}` : `#${String(row.id).slice(0, 4).toUpperCase()}`,
     name: row.customer_name,
     phone: row.customer_phone,
-    address: row.fulfillment === "pickup" ? "Retirada no Balcao" : row.delivery_address?.street || row.delivery_address?.address || "",
+    address: row.fulfillment === "pickup" ? "Retirada no Balcao" : formatDeliveryAddress(row.delivery_address),
     complement: row.delivery_address?.complement || "",
     payment: payment === "pix" ? "Pix" : payment === "cash" ? "Dinheiro" : payment === "ifood" ? "Pago pelo App (iFood)" : "Cartao",
     paymentStatus: paymentRecord?.status || "pending",
